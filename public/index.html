@@ -139,8 +139,10 @@ body{font-family:"Nunito",system-ui,sans-serif;display:flex;height:100vh;overflo
 <script>
 "use strict";
 
-// Update this to the build chat when handing the dashboard to another session.
-const SOURCE_CHAT_URL = "https://claude.ai/cowork";
+// Default build chat (the session that built this dashboard frame).
+// Each nav item can override with its own `chat` URL — new sub-widgets built
+// in other chats should set item.chat to their build chat.
+const SOURCE_CHAT_URL = "https://claude.ai/cowork/cse_01G9RPR1XJfihMy8gmFT5Jc6";
 
 const ic = p => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const ICONS = {
@@ -154,8 +156,10 @@ const NAV_SECTIONS = [
   {
     label: "Call Center", color: "#f40070", defaultOpen: true,
     items: [
-      { icon: "dollar", label: "Payroll", path: "/widgets/payroll/", sub: "Sets, sits & commission — Friday buckets" },
-      { icon: "clock",  label: "Hours",   path: "/widgets/hours/",   sub: "VICIdial login hours — Monday payout" },
+      { icon: "dollar", label: "Payroll", path: "/widgets/payroll/", sub: "Sets, sits & commission — Friday buckets",
+        chat: "https://claude.ai/cowork/cse_01G9RPR1XJfihMy8gmFT5Jc6" },
+      { icon: "clock",  label: "Hours",   path: "/widgets/hours/",   sub: "VICIdial login hours — Monday payout",
+        chat: "https://claude.ai/cowork/cse_01G9RPR1XJfihMy8gmFT5Jc6" },
     ],
   },
   {
@@ -212,7 +216,7 @@ function select(item, btn, secColor){
   btn.style.color = col;
   document.getElementById("pageTitle").textContent = item.label;
   document.getElementById("pageSub").textContent = item.sub || "";
-  document.getElementById("editLink").href = SOURCE_CHAT_URL;
+  document.getElementById("editLink").href = item.chat || SOURCE_CHAT_URL;
   if (item.soon || !item.path){
     holder.innerHTML = `<div class="placeholder"><div class="ph-card"><h2>Coming Soon</h2><p>${item.label} isn't built yet.</p></div></div>`;
     return;
