@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Payroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ll-green:#00b580; --ll-magenta:#f40070; --ll-purple:#8a56f3;
+  --ll-cyan:#00c5ff;  --ll-yellow:#ffd900;  --ll-black:#191718;
+  --ll-surface:#f9fafb; --ll-border:#e5e7eb;
+  --muted:#6b7280; --dim:#a1a1aa;
+  --card-shadow:0 1px 3px rgba(25,23,24,.08), 0 16px 36px rgba(25,23,24,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Nunito",system-ui,sans-serif; color:var(--ll-black);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0,181,128,.06), transparent 28%),
+    linear-gradient(180deg,#fff 0%, #f9fafb 34%, #f6f7f8 100%);
+  min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1440px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{
+  border:1px solid rgba(229,231,235,.92); background:rgba(255,255,255,.94);
+  box-shadow:var(--card-shadow); border-radius:14px; padding:18px;
+  animation:fadeUp 260ms ease both;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:6px;color:#00a777;
+  font-family:"Outfit",sans-serif;font-size:.72rem;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px;
+}
+.card-h{font-family:"Nunito";font-size:1.08rem;font-weight:850;line-height:1.05;margin:0 0 2px}
+.card-sub{font-size:.87rem;color:var(--muted);font-weight:700;margin:0}
+
+.filter-bar{
+  border:1px solid rgba(229,231,235,.92); border-radius:18px;
+  background:rgba(255,255,255,.96); box-shadow:var(--card-shadow);
+  padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  position:relative; z-index:40; animation:fadeUp 260ms ease both;
+}
+.filter-control{
+  display:inline-flex;align-items:center;gap:9px;min-height:40px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;
+  color:var(--ll-black);font-family:"Nunito",sans-serif;font-size:.93rem;
+  font-weight:850;padding:0 16px;box-shadow:0 1px 2px rgba(25,23,24,.04);
+  cursor:pointer;transition:border-color 160ms ease,box-shadow 160ms ease;white-space:nowrap;
+}
+.filter-control:hover,.filter-control[aria-expanded="true"]{
+  border-color:rgba(138,86,243,.62); box-shadow:0 7px 18px rgba(138,86,243,.08);
+}
+.filter-control .chev{transition:transform 160ms ease;color:#9ca3af}
+.filter-control[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.freshness{margin-left:auto;font-size:.78rem;font-weight:700;color:var(--muted)}
+.pop-wrap{position:relative}
+.pop{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:60;display:none;
+  width:min(320px,calc(100vw - 48px));border:1px solid rgba(229,231,235,.94);
+  border-radius:13px;background:#fff;
+  box-shadow:0 22px 54px rgba(25,23,24,.14),0 2px 8px rgba(25,23,24,.08);overflow:hidden;
+}
+.pop.open{display:block}
+.pop-list{max-height:340px;overflow:auto;padding:8px}
+.pop-item{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;
+  cursor:pointer;font-size:.9rem;font-weight:750;color:#3f3f46;
+  transition:background 140ms ease;
+}
+.pop-item:hover{background:#f4f4f5}
+.pop-item.on{background:rgba(0,197,255,.12);color:#0094aa;font-weight:850}
+.pop-item .tag{
+  margin-left:auto;font-size:.66rem;font-weight:900;letter-spacing:.06em;
+  border-radius:999px;padding:2px 8px;color:#8a6d00;background:rgba(255,217,0,.18);
+}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.metric-card{position:relative;overflow:hidden}
+.metric-card::after{
+  content:"";position:absolute;right:-22px;bottom:-38px;width:112px;height:112px;
+  border-radius:999px;opacity:.09;background:currentColor;pointer-events:none;
+}
+.mc-top{display:flex;align-items:flex-start;justify-content:space-between}
+.badge{
+  width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:color-mix(in srgb,currentColor 12%,white);
+}
+.chip{display:inline-flex;align-items:center;gap:2px;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:850}
+.chip.active{color:#007e5c;background:rgba(0,181,128,.10)}
+.chip.watch{color:#b90053;background:rgba(244,0,112,.09)}
+.chip.info{color:#8a6d00;background:rgba(255,217,0,.16)}
+.mc-label{
+  font-family:"Nunito";font-size:.82rem;font-weight:850;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);margin-top:14px;
+}
+.mc-value{
+  font-family:"Outfit",sans-serif;font-size:clamp(1.65rem,2.4vw,2.35rem);
+  font-weight:900;line-height:1;margin-top:2px;
+}
+.mc-help{font-family:"Nunito";font-size:.87rem;font-weight:700;color:var(--muted);margin-top:6px}
+.c-cyan{color:var(--ll-cyan)} .c-green{color:var(--ll-green)}
+.c-magenta{color:var(--ll-magenta)} .c-purple{color:var(--ll-purple)}
+.c-yellow{color:#d09f00}
+
+.tbl-scroll{overflow:auto;margin:0 -18px;padding:0 18px}
+table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
+thead th{
+  text-align:left;font-size:.7rem;font-weight:900;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);padding:0 12px 10px;white-space:nowrap;
+}
+thead th.r, td.r{text-align:right}
+tbody td{padding:11px 12px;border-top:1px solid #f1f2f4;white-space:nowrap}
+tbody tr:hover{background:#fafafa}
+tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900}
+.mono{font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);font-weight:700;font-size:.78rem}
+.agent-name{font-weight:850}
+.total-pill{
+  display:inline-block;border-radius:999px;padding:4px 12px;font-weight:900;
+  color:#007e5c;background:rgba(0,181,128,.10);
+}
+.warn-row td{color:#8a6d00;background:rgba(255,217,0,.06)}
+.note{
+  border:1px solid rgba(0,197,255,.25);background:rgba(0,197,255,.05);
+  border-radius:14px;padding:14px 18px;font-size:.83rem;font-weight:700;color:#1e6b78;
+}
+.err{
+  border:1px solid rgba(244,0,112,.3);background:rgba(244,0,112,.05);color:#b90053;
+  border-radius:14px;padding:18px;font-weight:750;
+}
+.skel{
+  background:linear-gradient(90deg,#f1f2f4 25%,#e9eaec 50%,#f1f2f4 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px;
+}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="filter-bar">
+    <div class="pop-wrap">
+      <button class="filter-control" id="friBtn" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span id="friLabel">—</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="friPop"><div class="pop-list" id="friList"></div></div>
+    </div>
+    <div class="freshness" id="freshness">Loading…</div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+"use strict";
+
+/* -------- pay constants (Contact Center Agent Payroll doc, Jun 1 2026+) -------- */
+const SET_BONUS = 5.0;
+const SIT_BONUS = 5.0;
+const SIT_RATE = 0.60;
+const CLOSE_RATE = 0.04;
+const AVG_PROJECT = 15274;
+const REV_SHARE = 0.001;
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+const S = { data:null, err:null, friday:null, fridays:[] };
+
+/* ------------------------------------------------------------- date utils */
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const fmt = s => { const d=parse(s); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+const fmtLong = s => { const d=parse(s); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`; };
+const money = n => "$" + n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// Pay buckets for a given Friday (doc Part 3):
+//   sets   = previous full week, Mon–Sun
+//   sits   = two weeks ago, Mon–Sun (paid at SIT_RATE)
+function buckets(fridayIso){
+  const f = parse(fridayIso);
+  const monThis = addDays(f, -((f.getDay()+6)%7));   // Monday of Friday's week
+  const setsStart = addDays(monThis,-7), setsEnd = addDays(monThis,-1);
+  const sitsStart = addDays(monThis,-14), sitsEnd = addDays(monThis,-8);
+  return { sets:[iso(setsStart),iso(setsEnd)], sits:[iso(sitsStart),iso(sitsEnd)] };
+}
+
+// First Friday on or after the 5th of the month (doc Part 4)
+function commissionFriday(year, month){ // month 0-based
+  for(let d=5; d<=11; d++){
+    const dt = new Date(year, month, d);
+    if(dt.getDay()===5) return iso(dt);
+  }
+  return null;
+}
+
+// Is this Friday a commission Friday? If so it pays the PREVIOUS full
+// calendar month (the month that just closed).
+function commissionInfo(fridayIso){
+  const f = parse(fridayIso);
+  if(iso(f) !== commissionFriday(f.getFullYear(), f.getMonth())) return null;
+  const prev = new Date(f.getFullYear(), f.getMonth()-1, 1);
+  const start = iso(prev);
+  const end = iso(new Date(prev.getFullYear(), prev.getMonth()+1, 0));
+  return { start, end, label: `${MONTHS[prev.getMonth()]} ${prev.getFullYear()}` };
+}
+
+/* ------------------------------------------------------------------ fetch */
+async function load(){
+  try{
+    const r = await fetch("/api/data", { cache:"no-store" });
+    if(r.status===401){ parent.location.href="/login"; return; }
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    S.data = j;
+    buildFridays();
+    renderFreshness();
+  }catch(e){ S.err = String(e.message||e); }
+  render();
+}
+
+function buildFridays(){
+  // Fridays from mid-June 2026 through the next Friday after today.
+  const out=[];
+  let d = new Date(2026,5,12); // Fri Jun 12 2026 — first payable Friday under new formula
+  const today = new Date();
+  const stop = addDays(today, 7);
+  while(d <= stop){ out.push(iso(d)); d = addDays(d,7); }
+  S.fridays = out.reverse(); // newest first
+  // default = upcoming Friday (today if Friday)
+  let def = new Date(today);
+  while(def.getDay()!==5) def = addDays(def,1);
+  S.friday = iso(def);
+  if(!S.fridays.includes(S.friday)) S.fridays.unshift(S.friday);
+
+  const list = document.getElementById("friList");
+  list.innerHTML = S.fridays.map(f=>{
+    const ci = commissionInfo(f);
+    return `<div class="pop-item${f===S.friday?" on":""}" data-f="${f}">
+      Friday, ${fmtLong(f)} ${ci?`<span class="tag">+ COMMISSION</span>`:""}
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.friday = el.dataset.f;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.f===S.friday));
+      closePop(); render();
+    };
+  });
+}
+
+function renderFreshness(){
+  const m = S.data && S.data.meta;
+  const el = document.getElementById("freshness");
+  if(m && m.last_sync){
+    const t = new Date(m.last_sync);
+    el.textContent = "Data synced " + t.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  } else el.textContent = "";
+}
+
+/* ------------------------------------------------------------------ math */
+// appts rows: [booked_date, agent_user|null, campaign, first, last, city, state]
+function countInRange(rows, a, b){
+  const per = {}; let un = 0;
+  for(const r of rows){
+    const d = r[0];
+    if(d < a || d > b) continue;
+    if(r[1]) per[r[1]] = (per[r[1]]||0)+1;
+    else un++;
+  }
+  return { per, un };
+}
+
+function compute(){
+  const rows = S.data.appts;
+  const bk = buckets(S.friday);
+  const ci = commissionInfo(S.friday);
+
+  const sets = countInRange(rows, bk.sets[0], bk.sets[1]);
+  const sits = countInRange(rows, bk.sits[0], bk.sits[1]);
+  const comm = ci ? countInRange(rows, ci.start, ci.end) : null;
+
+  const users = new Set([
+    ...Object.keys(S.data.agents),
+    ...Object.keys(sets.per), ...Object.keys(sits.per),
+    ...(comm?Object.keys(comm.per):[]),
+  ]);
+
+  const perAgent = [];
+  for(const u of users){
+    const nSets = sets.per[u]||0;
+    const sitBase = sits.per[u]||0;
+    const nSits = Math.round(sitBase * SIT_RATE);
+    const setPay = nSets * SET_BONUS;
+    const sitPay = nSits * SIT_BONUS;
+    let commPay = 0, commAppts = 0;
+    if(comm){
+      commAppts = comm.per[u]||0;
+      commPay = commAppts * CLOSE_RATE * AVG_PROJECT * REV_SHARE;
+    }
+    const total = setPay + sitPay + commPay;
+    if(nSets===0 && sitBase===0 && commAppts===0) continue;
+    perAgent.push({
+      user:u, name:S.data.agents[u]||u,
+      nSets, setPay, sitBase, nSits, sitPay, commAppts, commPay, total,
+    });
+  }
+  perAgent.sort((a,b)=>b.total-a.total);
+  return { bk, ci, perAgent, unSets:sets.un, unSits:sits.un, unComm:comm?comm.un:0 };
+}
+
+/* ---------------------------------------------------------------- render */
+function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function render(){
+  const c = document.getElementById("content");
+  document.getElementById("friLabel").textContent = S.friday ? "Friday, " + fmtLong(S.friday) : "—";
+  if(S.err){
+    c.innerHTML = `<div class="err"><strong>Couldn't load payroll data.</strong><br>${esc(S.err)}</div>`;
+    return;
+  }
+  if(!S.data){
+    c.innerHTML = `<div class="kpi-row">${'<div class="card skel" style="height:150px"></div>'.repeat(4)}</div>
+      <div class="card skel" style="height:280px;margin-top:14px"></div>`;
+    return;
+  }
+  const R = compute();
+  c.innerHTML = kpis(R) + tableCard(R) + noteCard(R);
+}
+
+function kpis(R){
+  const totSets = R.perAgent.reduce((a,x)=>a+x.nSets,0);
+  const totSetPay = R.perAgent.reduce((a,x)=>a+x.setPay,0);
+  const totSits = R.perAgent.reduce((a,x)=>a+x.nSits,0);
+  const totSitPay = R.perAgent.reduce((a,x)=>a+x.sitPay,0);
+  const totComm = R.perAgent.reduce((a,x)=>a+x.commPay,0);
+  const grand = R.perAgent.reduce((a,x)=>a+x.total,0);
+
+  const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const tile = (cls,icon,label,value,help,chip) => `
+    <div class="card metric-card ${cls}">
+      <div class="mc-top"><div class="badge">${icon}</div>${chip||""}</div>
+      <div class="mc-label">${label}</div>
+      <div class="mc-value">${value}</div>
+      <div class="mc-help">${help}</div>
+    </div>`;
+
+  const nextCF = (()=>{ // when is the next commission friday relative to selection
+    const f = parse(S.friday);
+    return commissionFriday(f.getFullYear(), f.getMonth());
+  })();
+
+  return `<div class="kpi-row">
+    ${tile("c-green", ic('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+      "Friday Payout", money(grand),
+      `${R.perAgent.length} agent${R.perAgent.length===1?"":"s"} · pays ${fmt(S.friday)}`,
+      '<span class="chip active">↗ Active</span>')}
+    ${tile("c-cyan", ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/>'),
+      "Set Bonus", money(totSetPay),
+      `${totSets} appts × $5 · ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])}`)}
+    ${tile("c-purple", ic('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
+      "Sit Bonus", money(totSitPay),
+      `${totSits} est. sits (60%) · ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}`)}
+    ${tile("c-yellow", ic('<path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/>'),
+      "Sales Commission", R.ci ? money(totComm) : "—",
+      R.ci ? `${R.ci.label} · 4% close × $15,274 × 0.1%` : `Pays ${nextCF ? fmt(nextCF) : "next commission Friday"}`,
+      R.ci ? '<span class="chip info">Commission Friday</span>' : "")}
+  </div>`;
+}
+
+function tableCard(R){
+  const rows = R.perAgent.map(x=>`
+    <tr>
+      <td class="agent-name">${esc(x.name)} <span class="sub">${esc(x.user)}</span></td>
+      <td class="r mono">${x.nSets} <span class="sub">× $5</span></td>
+      <td class="r mono">${money(x.setPay)}</td>
+      <td class="r mono">${x.nSits} <span class="sub">of ${x.sitBase}</span></td>
+      <td class="r mono">${money(x.sitPay)}</td>
+      ${R.ci?`<td class="r mono">${x.commAppts}</td><td class="r mono">${money(x.commPay)}</td>`:""}
+      <td class="r"><span class="total-pill mono">${money(x.total)}</span></td>
+    </tr>`).join("");
+
+  const un = (R.unSets||R.unSits) ? `
+    <tr class="warn-row">
+      <td class="agent-name">Unattributed <span class="sub">no VICIdial match</span></td>
+      <td class="r mono">${R.unSets}</td><td class="r mono">—</td>
+      <td class="r mono">${R.unSits}</td><td class="r mono">—</td>
+      ${R.ci?`<td class="r mono">${R.unComm}</td><td class="r mono">—</td>`:""}
+      <td class="r mono">—</td>
+    </tr>` : "";
+
+  const t = {
+    sets:R.perAgent.reduce((a,x)=>a+x.nSets,0), setPay:R.perAgent.reduce((a,x)=>a+x.setPay,0),
+    sits:R.perAgent.reduce((a,x)=>a+x.nSits,0), sitPay:R.perAgent.reduce((a,x)=>a+x.sitPay,0),
+    commA:R.perAgent.reduce((a,x)=>a+x.commAppts,0), comm:R.perAgent.reduce((a,x)=>a+x.commPay,0),
+    grand:R.perAgent.reduce((a,x)=>a+x.total,0),
+  };
+
+  return `<div class="card">
+    <div class="eyebrow">Friday Commission Run</div>
+    <h2 class="card-h">Per-Agent Payout — Friday ${fmtLong(S.friday)}</h2>
+    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])} (60% rate)${R.ci?` · Commission: ${R.ci.label}`:""}</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr>
+        <th>Agent</th><th class="r">Sets</th><th class="r">Set $</th>
+        <th class="r">Est. Sits</th><th class="r">Sit $</th>
+        ${R.ci?'<th class="r">Mo. Appts</th><th class="r">Commission</th>':""}
+        <th class="r">Friday Total</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="9" class="sub" style="padding:30px;text-align:center">No appointments in these windows.</td></tr>`}${un}</tbody>
+      <tfoot><tr>
+        <td>Total</td>
+        <td class="r mono">${t.sets}</td><td class="r mono">${money(t.setPay)}</td>
+        <td class="r mono">${t.sits}</td><td class="r mono">${money(t.sitPay)}</td>
+        ${R.ci?`<td class="r mono">${t.commA}</td><td class="r mono">${money(t.comm)}</td>`:""}
+        <td class="r mono">${money(t.grand)}</td>
+      </tr></tfoot>
+    </table>
+    </div>
+  </div>`;
+}
+
+function noteCard(R){
+  return `<div class="note">
+    <strong>How this is calculated:</strong> $5 per set (last full week) · $5 per estimated sit
+    (60% of sets from two weeks ago, rounded) · monthly commission on the first Friday on/after the 5th
+    = prior-month appts × 4% close × $15,274 avg project × 0.1% share (≈ $0.61/appt).
+    Blended: ~$8.61 per appointment. Hourly pay is separate — see the Hours page (paid Mondays).
+    Appointments are attributed by matching the lead's phone to VICIdial call logs (APPTBK preferred);
+    unmatched appointments appear as Unattributed.
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- popover */
+const friBtn = document.getElementById("friBtn");
+const friPop = document.getElementById("friPop");
+function closePop(){ friPop.classList.remove("open"); friBtn.setAttribute("aria-expanded","false"); }
+friBtn.onclick = (e)=>{
+  e.stopPropagation();
+  const open = friPop.classList.toggle("open");
+  friBtn.setAttribute("aria-expanded", open?"true":"false");
+};
+document.addEventListener("click", (e)=>{ if(!friPop.contains(e.target)) closePop(); });
+document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closePop(); });
+
+load();
+</script>
+</body>
+</html>

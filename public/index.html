@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LL.Media — Contact Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --brand-black:#191718; --brand-green:#00b580; --brand-cyan:#00c5ff;
+  --brand-magenta:#f40070; --brand-purple:#8a56f3; --brand-amber:#f9a825;
+  --brand-slate:#94a3b8; --border:#e5e7eb;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:"Nunito",system-ui,sans-serif;display:flex;height:100vh;overflow:hidden;background:#f9fafb}
+
+/* ---------------- sidebar ---------------- */
+.sidebar{
+  width:236px;min-width:236px;background:var(--brand-black);color:#e7e5e4;
+  display:flex;flex-direction:column;transition:margin-left 200ms ease;
+}
+.sidebar.collapsed{margin-left:-236px}
+.brand{
+  padding:20px 18px 14px;display:flex;align-items:baseline;gap:6px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.brand .word{font-family:"Outfit";font-weight:900;font-size:1.15rem;color:#fff;letter-spacing:-.02em}
+.brand .dot{color:var(--brand-green)}
+.brand .sub{font-size:.68rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#a8a29e}
+.nav{flex:1;overflow-y:auto;padding:10px 10px 20px}
+.sec{margin-top:14px}
+.sec-h{
+  display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;
+  cursor:pointer;padding:6px 8px;font-family:"Nunito";font-size:.68rem;font-weight:900;
+  letter-spacing:.14em;text-transform:uppercase;
+}
+.sec-h .tick{margin-left:auto;transition:transform 160ms ease;color:#57534e}
+.sec.closed .tick{transform:rotate(-90deg)}
+.sec.closed .items{display:none}
+.items{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.item{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;
+  color:#d6d3d1;text-decoration:none;font-size:.9rem;font-weight:700;cursor:pointer;
+  border:none;background:none;font-family:"Nunito";text-align:left;width:100%;
+  transition:background 140ms ease,color 140ms ease;
+}
+.item:hover{background:rgba(255,255,255,.06);color:#fff}
+.item.active{background:rgba(255,255,255,.10);color:#fff}
+.item svg{flex:0 0 auto;opacity:.85}
+.item .soon{
+  margin-left:auto;font-size:.6rem;font-weight:900;letter-spacing:.08em;
+  color:#78716c;border:1px solid #44403c;border-radius:999px;padding:2px 7px;
+}
+.side-foot{
+  padding:12px 16px;border-top:1px solid rgba(255,255,255,.07);
+  font-size:.72rem;font-weight:700;color:#78716c;display:flex;align-items:center;gap:8px;
+}
+.side-foot button{
+  margin-left:auto;background:none;border:none;color:#78716c;cursor:pointer;
+  font-family:"Nunito";font-size:.72rem;font-weight:800;padding:0;
+}
+.side-foot button:hover{color:#d6d3d1}
+
+/* ---------------- main ---------------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{
+  display:flex;align-items:center;gap:12px;background:#fff;
+  border-bottom:1px solid var(--border);padding:10px 16px;flex-shrink:0;
+}
+.burger{
+  border:1px solid var(--border);background:#fff;border-radius:9px;cursor:pointer;
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#57534e;
+}
+.burger:hover{border-color:#c7cdd4}
+.page-title{font-family:"Outfit";font-weight:800;font-size:1.05rem;color:var(--brand-black)}
+.page-sub{font-size:.8rem;font-weight:700;color:#9ca3af}
+.edit-link{
+  margin-left:auto;display:flex;align-items:center;gap:5px;font-size:.78rem;
+  font-weight:800;color:#9ca3af;text-decoration:none;
+}
+.edit-link:hover{color:var(--brand-purple)}
+.frame-holder{flex:1;position:relative;background:#f9fafb}
+.frame-holder iframe{
+  position:absolute;inset:0;width:100%;height:100%;border:none;display:block;background:#f9fafb;
+}
+.placeholder{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+}
+.ph-card{
+  text-align:center;background:#fff;border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 1px 3px rgba(25,23,24,.08);padding:44px 60px;
+}
+.ph-card h2{font-family:"Outfit";font-weight:800;margin:0 0 6px;color:var(--brand-black)}
+.ph-card p{margin:0;color:#9ca3af;font-weight:700;font-size:.9rem}
+</style>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <span class="word">LL<span class="dot">.</span>MEDIA</span>
+    <span class="sub">Contact Center</span>
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <div class="side-foot">
+    <span>HomeLynk CC</span>
+    <button id="logout" title="Sign out">Sign out</button>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <button class="burger" id="burger" title="Toggle sidebar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div>
+      <div class="page-title" id="pageTitle">Payroll</div>
+      <div class="page-sub" id="pageSub"></div>
+    </div>
+    <a class="edit-link" id="editLink" target="_blank" rel="noopener noreferrer" title="Edit this widget">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Edit
+    </a>
+  </div>
+  <div class="frame-holder" id="frameHolder"></div>
+</div>
+
+<script>
+"use strict";
+
+// Update this to the build chat when handing the dashboard to another session.
+const SOURCE_CHAT_URL = "https://claude.ai/cowork";
+
+const ic = p => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS = {
+  dollar: ic('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+  clock:  ic('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+  trophy: ic('<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z"/>'),
+  zap:    ic('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+};
+
+const NAV_SECTIONS = [
+  {
+    label: "Call Center", color: "#f40070", defaultOpen: true,
+    items: [
+      { icon: "dollar", label: "Payroll", path: "/widgets/payroll/", sub: "Sets, sits & commission — Friday buckets" },
+      { icon: "clock",  label: "Hours",   path: "/widgets/hours/",   sub: "VICIdial login hours — Monday payout" },
+    ],
+  },
+  {
+    label: "Coming Soon", color: "#94a3b8", defaultOpen: false,
+    items: [
+      { icon: "trophy", label: "Leaderboard", soon: true },
+      { icon: "zap",    label: "Spiffs",      soon: true },
+    ],
+  },
+];
+
+const nav = document.getElementById("nav");
+const holder = document.getElementById("frameHolder");
+let activeBtn = null;
+
+function openState(label, fallback){
+  const v = localStorage.getItem("cc-sec-" + label);
+  return v === null ? fallback : v === "1";
+}
+
+NAV_SECTIONS.forEach(sec => {
+  const el = document.createElement("div");
+  el.className = "sec" + (openState(sec.label, sec.defaultOpen) ? "" : " closed");
+  const head = document.createElement("button");
+  head.className = "sec-h";
+  head.style.color = sec.color;
+  head.innerHTML = `<span>${sec.label}</span><span class="tick">▾</span>`;
+  head.onclick = () => {
+    el.classList.toggle("closed");
+    localStorage.setItem("cc-sec-" + sec.label, el.classList.contains("closed") ? "0" : "1");
+  };
+  const items = document.createElement("div");
+  items.className = "items";
+  sec.items.forEach(item => {
+    const b = document.createElement("button");
+    b.className = "item";
+    b.innerHTML = `${ICONS[item.icon] || ""}<span>${item.label}</span>${item.soon ? '<span class="soon">SOON</span>' : ""}`;
+    b.onclick = () => select(item, b);
+    items.appendChild(b);
+    if (!item.soon && !activeBtn) { activeBtn = b; }
+  });
+  el.appendChild(head); el.appendChild(items); nav.appendChild(el);
+});
+
+function select(item, btn){
+  document.querySelectorAll(".item.active").forEach(x => x.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("pageTitle").textContent = item.label;
+  document.getElementById("pageSub").textContent = item.sub || "";
+  document.getElementById("editLink").href = SOURCE_CHAT_URL;
+  if (item.soon || !item.path){
+    holder.innerHTML = `<div class="placeholder"><div class="ph-card"><h2>Coming Soon</h2><p>${item.label} isn't built yet.</p></div></div>`;
+    return;
+  }
+  holder.innerHTML = `<iframe src="${item.path}" title="${item.label}"></iframe>`;
+  try { history.replaceState(null, "", "#" + item.path.replace(/\W+/g, "-").replace(/^-|-$/g, "")); } catch(_){}
+}
+
+// initial page — honor #hours deep link
+const wantHours = location.hash.includes("hours");
+const first = wantHours
+  ? { item: NAV_SECTIONS[0].items[1], idx: 1 }
+  : { item: NAV_SECTIONS[0].items[0], idx: 0 };
+const btns = nav.querySelectorAll(".item");
+select(first.item, btns[first.idx]);
+
+document.getElementById("burger").onclick = () =>
+  document.getElementById("sidebar").classList.toggle("collapsed");
+
+document.getElementById("logout").onclick = () => {
+  document.cookie = "cc_session=; Path=/; Max-Age=0";
+  location.reload();
+};
+</script>
+</body>
+</html>

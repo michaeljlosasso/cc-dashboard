@@ -1,0 +1,10 @@
+{
+  "name": "cc-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LL.Media Contact Center dashboard — payroll + hours, agent-facing",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  }
+}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LL.Media — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:"Nunito",system-ui,sans-serif;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0,181,128,.08), transparent 30%),
+    radial-gradient(circle at 90% 100%, rgba(138,86,243,.07), transparent 32%),
+    linear-gradient(180deg,#fff 0%, #f9fafb 60%, #f6f7f8 100%);
+  padding:20px;
+}
+.card{
+  width:min(380px,100%);background:#fff;border:1px solid rgba(229,231,235,.92);
+  border-radius:14px;box-shadow:0 1px 3px rgba(25,23,24,.08),0 16px 36px rgba(25,23,24,.05);
+  padding:34px 32px;
+}
+.word{font-family:"Outfit";font-weight:900;font-size:1.35rem;color:#191718;letter-spacing:-.02em}
+.dot{color:#00b580}
+.sub{font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#9ca3af;margin-top:2px}
+h1{font-family:"Outfit";font-weight:800;font-size:1.05rem;margin:24px 0 4px;color:#191718}
+p{margin:0 0 18px;font-size:.86rem;font-weight:700;color:#6b7280}
+input{
+  width:100%;border:1.5px solid #e5e7eb;border-radius:10px;padding:11px 14px;
+  font-family:"Nunito";font-size:1rem;font-weight:700;outline:none;
+  transition:border-color 140ms ease;
+}
+input:focus{border-color:#8a56f3}
+button{
+  width:100%;margin-top:12px;border:none;border-radius:10px;padding:12px;
+  font-family:"Nunito";font-size:.95rem;font-weight:900;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,#00b580,#009a6d);
+  box-shadow:0 8px 18px rgba(0,181,128,.25);
+  transition:transform 140ms ease,box-shadow 140ms ease;
+}
+button:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(0,181,128,.3)}
+.err{
+  display:none;margin-top:12px;border:1px solid rgba(244,0,112,.3);
+  background:rgba(244,0,112,.05);color:#b90053;border-radius:10px;
+  padding:10px 12px;font-size:.83rem;font-weight:800;
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="word">LL<span class="dot">.</span>MEDIA</div>
+  <div class="sub">Contact Center</div>
+  <h1>Sign in</h1>
+  <p>Enter the team passcode to open the dashboard.</p>
+  <form id="f">
+    <input id="pc" type="password" placeholder="Passcode" autocomplete="current-password" autofocus />
+    <button type="submit">Open Dashboard</button>
+  </form>
+  <div class="err" id="err">Wrong passcode — try again.</div>
+</div>
+<script>
+document.getElementById("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ passcode: document.getElementById("pc").value }),
+  });
+  if (r.ok) { location.href = "/"; }
+  else { document.getElementById("err").style.display = "block"; }
+});
+</script>
+</body>
+</html>
