@@ -250,11 +250,7 @@ function render(){
     return;
   }
   const R = compute();
-  c.innerHTML = kpis(R) + tableCard(R) + `<div class="note">
-    <strong>How this is calculated:</strong> login hours are the span from an agent's first to last
-    VICIdial event each day. Hourly pay = total weekly hours × $5.00, paid every Monday for the
-    previous Mon–Sun week. Set/sit bonuses and commission are on the Payroll page (paid Fridays).
-  </div>`;
+  c.innerHTML = kpis(R) + tableCard(R);
 }
 
 function kpis(R){

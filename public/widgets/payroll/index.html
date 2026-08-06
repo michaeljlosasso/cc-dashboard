@@ -332,7 +332,7 @@ function render(){
     return;
   }
   const R = compute();
-  c.innerHTML = kpis(R) + tableCard(R) + noteCard(R);
+  c.innerHTML = kpis(R) + tableCard(R);
 }
 
 function kpis(R){
@@ -425,17 +425,6 @@ function tableCard(R){
       </tr></tfoot>
     </table>
     </div>
-  </div>`;
-}
-
-function noteCard(R){
-  return `<div class="note">
-    <strong>How this is calculated:</strong> $5 per set (last full week) · $5 per estimated sit
-    (60% of sets from two weeks ago, rounded) · monthly commission on the first Friday on/after the 5th
-    = prior-month appts × 4% close × $15,274 avg project × 0.1% share (≈ $0.61/appt).
-    Blended: ~$8.61 per appointment. Hourly pay is separate — see the Hours page (paid Mondays).
-    Appointments are attributed by matching the lead's phone to VICIdial call logs (APPTBK preferred);
-    unmatched appointments appear as Unattributed.
   </div>`;
 }
 
