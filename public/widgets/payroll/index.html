@@ -406,7 +406,7 @@ function tableCard(R){
   return `<div class="card">
     <div class="eyebrow">Friday Commission Run</div>
     <h2 class="card-h">Per-Agent Payout — Friday ${fmtLong(S.friday)}</h2>
-    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])} (60% rate)${R.ci?` · Commission: ${R.ci.label}`:""}</p>
+    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}${R.ci?` · Commission: ${R.ci.label}`:""}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr>
