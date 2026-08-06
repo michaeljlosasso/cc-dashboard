@@ -149,10 +149,19 @@ async function bq(env, sql) {
 const AGENT_RE = "^20[0-9]{2}$";
 const EXCLUDED_USERS = "('2001')";
 
+// Setter-name normalization applied inside SQL: one agent, one name.
+// Add future aliases here (lowercased) -> canonical lowercased name.
+const SETTER_ALIAS_SQL = `
+  CASE
+    WHEN LOWER(TRIM(setter)) IN ('andres anaya', 'andres estrada') THEN 'andres estrada'
+    ELSE LOWER(TRIM(setter))
+  END`;
+
 // Appointments = sold affiliate-212 (HomeLynk CC) leads. appt_setter is not
-// synced to BigQuery, so attribution matches the lead phone to VICIdial call
-// logs (outbound + inbound closer), preferring APPTBK dispositions closest in
-// time to the Leadspedia createdOn.
+// synced to BigQuery, so attribution priority is:
+//   1. leads.appt_setter_map (CSV backfill by leadID, Make rows by phone+date)
+//   2. VICIdial phone match (outbound + inbound closer, APPTBK preferred)
+//   3. unattributed
 const SQL_APPTS = `
 WITH sold AS (
   SELECT leadID,
@@ -189,6 +198,73 @@ GROUP BY s.leadID, s.createdOn
 ORDER BY booked_date
 `;
 
+// v2 — setter map first, phone-match fallback. Used when leads.appt_setter_map
+// exists; buildPayload falls back to SQL_APPTS if this errors (table missing).
+const SQL_APPTS_V2 = `
+WITH sold AS (
+  SELECT leadID,
+         REGEXP_REPLACE(phone_home, r'\\D', '') AS ph,
+         createdOn,
+         campaignName, first_name, last_name, city, state
+  FROM \`${PROJECT}.leads.leads_get_all\`
+  WHERE affiliateID = 212 AND sold = 'Yes' AND IFNULL(isTest,'No') != 'Yes'
+    AND createdOnDate >= '2026-01-01'
+),
+map AS (
+  SELECT leadID AS map_lead_id,
+         REGEXP_REPLACE(phone, r'\\D', '') AS ph,
+         set_at,
+         ${SETTER_ALIAS_SQL} AS setter_key
+  FROM \`${PROJECT}.leads.appt_setter_map\`
+  WHERE setter IS NOT NULL
+),
+users AS (
+  SELECT LOWER(TRIM(full_name)) AS fn, ANY_VALUE(user) AS user
+  FROM \`${PROJECT}.vicidial.vicidial_users\`
+  WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
+  GROUP BY fn
+),
+agent_calls AS (
+  SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
+  FROM \`${PROJECT}.vicidial.vicidial_log\`
+  WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
+  UNION ALL
+  SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
+  FROM \`${PROJECT}.vicidial.vicidial_closer_log\`
+  WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
+),
+picked AS (
+  SELECT
+    s.leadID, s.createdOn,
+    ANY_VALUE(s.campaignName) AS campaign,
+    ANY_VALUE(s.first_name) AS first_name,
+    ANY_VALUE(s.last_name) AS last_name,
+    ANY_VALUE(s.city) AS city,
+    ANY_VALUE(s.state) AS state,
+    ARRAY_AGG(mi.setter_key IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] AS set_by_id,
+    ARRAY_AGG(mp.setter_key IGNORE NULLS
+      ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), SECOND))
+      LIMIT 1)[SAFE_OFFSET(0)] AS set_by_phone,
+    ARRAY_AGG(c.user IGNORE NULLS
+      ORDER BY IF(c.status='APPTBK',0,1),
+               ABS(TIMESTAMP_DIFF(c.call_date, TIMESTAMP(s.createdOn), SECOND))
+      LIMIT 1)[SAFE_OFFSET(0)] AS call_user
+  FROM sold s
+  LEFT JOIN map mi ON mi.map_lead_id = s.leadID
+  LEFT JOIN map mp ON mp.ph = s.ph
+    AND ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), HOUR)) <= 168
+  LEFT JOIN agent_calls c ON c.ph = s.ph
+  GROUP BY s.leadID, s.createdOn
+)
+SELECT
+  FORMAT_DATETIME('%Y-%m-%d', p.createdOn) AS booked_date,
+  COALESCE(u.user, p.call_user) AS agent_user,
+  p.campaign, p.first_name, p.last_name, p.city, p.state
+FROM picked p
+LEFT JOIN users u ON u.fn = COALESCE(p.set_by_id, p.set_by_phone)
+ORDER BY booked_date
+`;
+
 const SQL_HOURS = `
 SELECT
   a.user,
@@ -216,8 +292,11 @@ FROM \`${PROJECT}.vicidial.vicidial_agent_log\`
 `;
 
 async function buildPayload(env) {
+  // Prefer setter-map attribution; fall back to phone-match-only if the
+  // appt_setter_map table doesn't exist yet.
+  const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
   const [appts, hours, agents, meta] = await Promise.all([
-    bq(env, SQL_APPTS),
+    apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
     bq(env, SQL_META),
