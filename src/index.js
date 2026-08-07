@@ -284,6 +284,25 @@ GROUP BY a.user, d
 ORDER BY d
 `;
 
+// Paused time by break code (LUNCH / BRK / ADMIN / everything else -> OTHER)
+const SQL_BREAKS = `
+SELECT
+  a.user,
+  FORMAT_DATE('%Y-%m-%d', DATE(a.event_time)) AS d,
+  CASE UPPER(IFNULL(NULLIF(TRIM(a.sub_status),''), IFNULL(NULLIF(TRIM(a.pause_type),''),'OTHER')))
+    WHEN 'LUNCH' THEN 'LUNCH'
+    WHEN 'BRK' THEN 'BRK'
+    WHEN 'ADMIN' THEN 'ADMIN'
+    ELSE 'OTHER'
+  END AS code,
+  ROUND(SUM(IFNULL(a.pause_sec,0))/3600.0, 2) AS hrs
+FROM \`${PROJECT}.vicidial.vicidial_agent_log\` a
+WHERE REGEXP_CONTAINS(a.user, r'${AGENT_RE}') AND a.user NOT IN ${EXCLUDED_USERS}
+  AND IFNULL(a.pause_sec,0) > 0
+GROUP BY a.user, d, code
+ORDER BY d
+`;
+
 const SQL_AGENTS = `
 SELECT user, ANY_VALUE(full_name) AS full_name
 FROM \`${PROJECT}.vicidial.vicidial_users\`
@@ -319,13 +338,14 @@ async function buildPayload(env) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
     bq(env, SQL_META),
     bq(env, SQL_SPIFFS).catch(() => ({ rows: [] })),
     bq(env, SQL_CONFIG).catch(() => ({ rows: [] })),
+    bq(env, SQL_BREAKS).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -344,6 +364,8 @@ async function buildPayload(env) {
     hours: hours.rows.map((r) => [r[0], r[1], Number(r[2]), Number(r[3])]),
     // [id, agent_user, amount, note, award_date]
     spiffs: spiffs.rows.map((r) => [r[0], r[1], Number(r[2]), r[3], r[4]]),
+    // [user, date, code, hours]
+    breaks: breaks.rows.map((r) => [r[0], r[1], r[2], Number(r[3])]),
     // {set_bonus, sit_bonus, sit_rate, close_rate, avg_project, rev_share, hourly_rate}
     config: configMap,
   };

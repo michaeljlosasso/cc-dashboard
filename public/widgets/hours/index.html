@@ -250,7 +250,62 @@ function render(){
     return;
   }
   const R = compute();
-  c.innerHTML = kpis(R) + tableCard(R);
+  c.innerHTML = kpis(R) + tableCard(R) + breaksCard(R);
+}
+
+function breaksCard(R){
+  const a = S.week, b = iso(addDays(parse(S.week),6));
+  const per = {}; // user -> {LUNCH, BRK, ADMIN, OTHER, total}
+  for(const [u,d,code,h] of (S.data.breaks||[])){
+    if(d<a || d>b) continue;
+    if(!per[u]) per[u] = {LUNCH:0, BRK:0, ADMIN:0, OTHER:0, total:0};
+    per[u][code] = (per[u][code]||0)+h;
+    per[u].total += h;
+  }
+  const worked = {}; for(const x of R.rows) worked[x.user] = x.total;
+  const users = Object.keys(per).sort((x,y)=>(per[y].total)-(per[x].total));
+  if(!users.length) return "";
+
+  const rows = users.map(u=>{
+    const p = per[u], w = worked[u]||0;
+    const pct = w>0 ? Math.round(p.total/w*100) : 0;
+    const cell = v => v>=0.05 ? hrs(v) : "—";
+    return `<tr>
+      <td class="agent-name">${esc(S.data.agents[u]||u)} <span class="sub">${esc(u)}</span></td>
+      <td class="r mono">${cell(p.LUNCH)}</td>
+      <td class="r mono">${cell(p.BRK)}</td>
+      <td class="r mono">${cell(p.ADMIN)}</td>
+      <td class="r mono">${cell(p.OTHER)}</td>
+      <td class="r mono" style="font-weight:900">${hrs(p.total)}</td>
+      <td class="r mono">${w?hrs(w):"—"}</td>
+      <td class="r mono${pct>=35?" sub":""}" style="${pct>=35?"color:#b90053;font-weight:900":""}">${w?pct+"%":"—"}</td>
+    </tr>`;
+  }).join("");
+
+  const t = {L:0,B:0,A:0,O:0,tot:0,w:0};
+  users.forEach(u=>{const p=per[u]; t.L+=p.LUNCH; t.B+=p.BRK; t.A+=p.ADMIN; t.O+=p.OTHER; t.tot+=p.total; t.w+=(worked[u]||0);});
+
+  return `<div class="card">
+    <div class="eyebrow" style="color:#8a56f3">Break Time</div>
+    <h2 class="card-h">Breaks by Agent — Week of ${fmt(S.week)}</h2>
+    <p class="card-sub">Paused time by code · breaks are paid, logged-out time is not</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr>
+        <th>Agent</th><th class="r">Lunch</th><th class="r">Break</th><th class="r">Admin</th>
+        <th class="r">Other</th><th class="r">Total Breaks</th><th class="r">Hours Worked</th><th class="r">Break %</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>Total</td>
+        <td class="r mono">${hrs(t.L)}</td><td class="r mono">${hrs(t.B)}</td>
+        <td class="r mono">${hrs(t.A)}</td><td class="r mono">${hrs(t.O)}</td>
+        <td class="r mono">${hrs(t.tot)}</td><td class="r mono">${hrs(t.w)}</td>
+        <td class="r mono">${t.w>0?Math.round(t.tot/t.w*100)+"%":"—"}</td>
+      </tr></tfoot>
+    </table>
+    </div>
+  </div>`;
 }
 
 function kpis(R){
