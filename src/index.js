@@ -170,7 +170,7 @@ WITH sold AS (
          createdOn,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
-  WHERE affiliateID = 212 AND sold = 'Yes' AND IFNULL(isTest,'No') != 'Yes'
+  WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
     AND createdOnDate >= '2026-01-01'
 ),
 agent_calls AS (
@@ -208,7 +208,7 @@ WITH sold AS (
          createdOn,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
-  WHERE affiliateID = 212 AND sold = 'Yes' AND IFNULL(isTest,'No') != 'Yes'
+  WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
     AND createdOnDate >= '2026-01-01'
 ),
 map AS (
