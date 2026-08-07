@@ -516,7 +516,9 @@ export default {
     /* ---- static, behind the gate ---- */
     // Workers Assets serves login.html at the clean URL /login (it 307s the
     // .html form), so always gate-rewrite to /login to avoid redirect loops.
-    if (!authed && path !== "/login") {
+    // The logo files stay public so the sign-in page can render its branding.
+    const PUBLIC_PATHS = new Set(["/login", "/logo.png", "/logo-full.png"]);
+    if (!authed && !PUBLIC_PATHS.has(path)) {
       const accept = request.headers.get("Accept") || "";
       if (accept.includes("text/html")) {
         return env.ASSETS.fetch(new Request(new URL("/login", url.origin), { method: "GET" }));
