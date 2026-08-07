@@ -15,7 +15,7 @@
  */
 
 const PROJECT = "ll-media-project";
-const CACHE_SECONDS = 900; // 15 min — Leadspedia/VICIdial sync into BQ continuously
+const CACHE_SECONDS = 120; // 2 min — short enough that spiff/rate edits show up fast everywhere
 // Read/write scope: admin endpoints INSERT into cc_spiffs / cc_config.
 const TOKEN_SCOPE = "https://www.googleapis.com/auth/bigquery";
 const COOKIE_NAME = "cc_session";
