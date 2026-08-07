@@ -367,10 +367,10 @@ function kpis(R){
       `${totSets} appts × $5 · ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])}`)}
     ${tile("c-purple", ic('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
       "Sit Bonus", money(totSitPay),
-      `${totSits} est. sits (60%) · ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}`)}
+      `${totSits} sits · ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}`)}
     ${tile("c-yellow", ic('<path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/>'),
       "Sales Commission", R.ci ? money(totComm) : "—",
-      R.ci ? `${R.ci.label} · 4% close × $15,274 × 0.1%` : `Pays ${nextCF ? fmt(nextCF) : "next commission Friday"}`,
+      R.ci ? `${R.ci.label}` : `Pays ${nextCF ? fmt(nextCF) : "next commission Friday"}`,
       R.ci ? '<span class="chip info">Commission Friday</span>' : "")}
   </div>`;
 }
