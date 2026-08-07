@@ -3,10 +3,10 @@
 ## Next up
 
 - [ ] **Setter attribution v2 (closes the text-set blind spot)**
-  - [ ] Create `leads.appt_setter_map` table (session creds are read-only — Manny runs the CREATE TABLE in BigQuery console, or grants the SA write on the dataset)
-  - [ ] Manny: CSV export of sold leads (June 1+) from Leadspedia UI → load `appt_setter` history into the map (`source='csv_backfill'`)
+  - [x] Create `leads.appt_setter_map` table (done — SA granted project write)
+  - [x] Backfill loaded: 683 rows, Jun 1 – Aug 6 (`source='csv_backfill'`, Andres normalized)
   - [ ] Manny: add BigQuery "Insert Row" module to the ONE Make scenario that posts to Slack → writes phone/setter/set_at/account (`source='make'`)
-  - [ ] Update Worker attribution priority: setter map (leadID, else phone+date) → VICIdial phone-match → unattributed
+  - [x] Worker attribution: setter map (leadID, else phone+date) → VICIdial phone-match → unattributed (live)
   - Note: do NOT try to edit the ~100 GHL webhook workflows that post into Leadspedia — Make is the single choke point
 
 - [ ] **Payroll snapshots + Mark as Paid** — freeze what was actually paid so history can't drift
