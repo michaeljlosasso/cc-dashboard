@@ -16,7 +16,8 @@
 
 const PROJECT = "ll-media-project";
 const CACHE_SECONDS = 900; // 15 min — Leadspedia/VICIdial sync into BQ continuously
-const TOKEN_SCOPE = "https://www.googleapis.com/auth/bigquery.readonly";
+// Read/write scope: admin endpoints INSERT into cc_spiffs / cc_config.
+const TOKEN_SCOPE = "https://www.googleapis.com/auth/bigquery";
 const COOKIE_NAME = "cc_session";
 const COOKIE_DAYS = 30;
 
@@ -291,19 +292,41 @@ SELECT
 FROM \`${PROJECT}.vicidial.vicidial_agent_log\`
 `;
 
+// Admin-managed tables. Both queries fail gracefully (empty) until Manny
+// creates leads.cc_spiffs / leads.cc_config and grants the SA dataEditor.
+const SQL_SPIFFS = `
+SELECT id, agent_user, amount, IFNULL(note,'') AS note,
+       FORMAT_DATE('%Y-%m-%d', award_date) AS d
+FROM \`${PROJECT}.leads.cc_spiffs\`
+ORDER BY award_date DESC, created_at DESC
+`;
+
+const SQL_CONFIG = `
+SELECT key, value FROM \`${PROJECT}.leads.cc_config\`
+`;
+
+function sqlStr(s, max) {
+  return "'" + String(s).slice(0, max || 200).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+}
+
 async function buildPayload(env) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
     bq(env, SQL_META),
+    bq(env, SQL_SPIFFS).catch(() => ({ rows: [] })),
+    bq(env, SQL_CONFIG).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
   for (const [user, name] of agents.rows) agentMap[user] = name;
+
+  const configMap = {};
+  for (const [k, v] of config.rows) configMap[k] = Number(v);
 
   return {
     generated_at: new Date().toISOString(),
@@ -313,7 +336,81 @@ async function buildPayload(env) {
     appts: appts.rows,
     // [user, date, login_hours, calls]
     hours: hours.rows.map((r) => [r[0], r[1], Number(r[2]), Number(r[3])]),
+    // [id, agent_user, amount, note, award_date]
+    spiffs: spiffs.rows.map((r) => [r[0], r[1], Number(r[2]), r[3], r[4]]),
+    // {set_bonus, sit_bonus, sit_rate, close_rate, avg_project, rev_share, hourly_rate}
+    config: configMap,
   };
+}
+
+/* ------------------------------------------------------------- admin ops */
+
+function isAdmin(body, env) {
+  return !!env.ADMIN_PASSCODE && body && body.admin === env.ADMIN_PASSCODE;
+}
+
+async function bustDataCache(url) {
+  const cacheKey = new Request(new URL("/api/data", url.origin).toString(), { method: "GET" });
+  await caches.default.delete(cacheKey);
+}
+
+async function handleAdmin(request, env, url) {
+  let body = {};
+  try { body = await request.json(); } catch (_) {}
+  if (!isAdmin(body, env)) {
+    return new Response(JSON.stringify({ error: "bad admin passcode" }), {
+      status: 403, headers: JSON_HEADERS,
+    });
+  }
+
+  if (url.pathname === "/api/spiff") {
+    const amount = Number(body.amount);
+    const agentUser = String(body.agent_user || "");
+    const date = String(body.award_date || "");
+    if (!/^20[0-9]{2}$/.test(agentUser)) throw new Error("bad agent_user");
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) throw new Error("bad amount");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("bad award_date");
+    const id = crypto.randomUUID();
+    await bq(env, `
+      INSERT INTO \`${PROJECT}.leads.cc_spiffs\` (id, agent_user, amount, note, award_date, created_at)
+      VALUES ('${id}', '${agentUser}', ${amount}, ${sqlStr(body.note || "")}, DATE '${date}', CURRENT_TIMESTAMP())
+    `);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true, id }), { headers: JSON_HEADERS });
+  }
+
+  if (url.pathname === "/api/spiff/delete") {
+    const id = String(body.id || "");
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("bad id");
+    await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_spiffs\` WHERE id = '${id}'`);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
+  if (url.pathname === "/api/config") {
+    const ALLOWED = ["set_bonus", "sit_bonus", "sit_rate", "close_rate", "avg_project", "rev_share", "hourly_rate"];
+    const values = body.values || {};
+    const pairs = [];
+    for (const k of ALLOWED) {
+      if (values[k] === undefined) continue;
+      const v = Number(values[k]);
+      if (!Number.isFinite(v) || v < 0) throw new Error(`bad value for ${k}`);
+      pairs.push([k, v]);
+    }
+    if (!pairs.length) throw new Error("no values");
+    for (const [k, v] of pairs) {
+      await bq(env, `
+        MERGE \`${PROJECT}.leads.cc_config\` t
+        USING (SELECT '${k}' AS key, ${v} AS value) s ON t.key = s.key
+        WHEN MATCHED THEN UPDATE SET value = s.value, updated_at = CURRENT_TIMESTAMP()
+        WHEN NOT MATCHED THEN INSERT (key, value, updated_at) VALUES (s.key, s.value, CURRENT_TIMESTAMP())
+      `);
+    }
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true, updated: pairs.length }), { headers: JSON_HEADERS });
+  }
+
+  return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: JSON_HEADERS });
 }
 
 /* --------------------------------------------------------------- handler */
@@ -347,6 +444,21 @@ export default {
     }
 
     const authed = await isAuthed(request, env);
+
+    /* ---- admin (spiffs + config) ---- */
+    if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config") && request.method === "POST") {
+      if (!authed) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
+      }
+      try {
+        return await handleAdmin(request, env, url);
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ error: String(err && err.message ? err.message : err) }),
+          { status: 400, headers: JSON_HEADERS }
+        );
+      }
+    }
 
     /* ---- api ---- */
     if (path.startsWith("/api/")) {

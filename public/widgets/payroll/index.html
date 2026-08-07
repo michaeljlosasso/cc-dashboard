@@ -138,6 +138,52 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900}
   background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px;
 }
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ---------------- admin ---------------- */
+.admin-link{
+  background:none;border:none;cursor:pointer;font-family:"Nunito";
+  font-size:.78rem;font-weight:800;color:#c7cdd4;padding:0 4px;
+}
+.admin-link:hover{color:var(--ll-purple)}
+.admin-pill{
+  display:inline-flex;align-items:center;gap:6px;min-height:34px;
+  border:1.5px solid rgba(138,86,243,.4);border-radius:999px;background:#fff;
+  color:var(--ll-purple);font-family:"Nunito";font-size:.82rem;font-weight:850;
+  padding:0 14px;cursor:pointer;transition:all 140ms ease;
+}
+.admin-pill:hover{background:rgba(138,86,243,.08)}
+.modal-veil{
+  position:fixed;inset:0;background:rgba(25,23,24,.35);z-index:100;
+  display:none;align-items:flex-start;justify-content:center;padding:60px 20px;
+}
+.modal-veil.open{display:flex}
+.modal{
+  width:min(460px,100%);background:#fff;border-radius:14px;
+  box-shadow:0 22px 54px rgba(25,23,24,.2);padding:22px;
+  max-height:80vh;overflow:auto;
+}
+.modal h3{font-family:"Outfit";font-weight:800;font-size:1.05rem;margin:0 0 14px}
+.modal label{display:block;font-size:.72rem;font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;color:#9ca3af;margin:12px 0 4px}
+.modal input,.modal select{
+  width:100%;border:1.5px solid var(--ll-border);border-radius:9px;padding:9px 12px;
+  font-family:"Nunito";font-size:.95rem;font-weight:700;outline:none;
+}
+.modal input:focus,.modal select:focus{border-color:var(--ll-purple)}
+.modal .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal .btns{display:flex;gap:10px;margin-top:18px;justify-content:flex-end}
+.modal button{
+  border:none;border-radius:9px;padding:10px 18px;font-family:"Nunito";
+  font-weight:900;font-size:.9rem;cursor:pointer;
+}
+.modal .primary{background:var(--ll-purple);color:#fff}
+.modal .ghost{background:#f4f4f5;color:#3f3f46}
+.modal .msg{margin-top:12px;font-size:.83rem;font-weight:800;display:none}
+.modal .msg.ok{color:#007e5c;display:block}
+.modal .msg.bad{color:#b90053;display:block}
+.spiff-list{margin-top:16px;border-top:1px solid #f1f2f4;padding-top:10px}
+.spiff-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.85rem;font-weight:700}
+.spiff-row .del{margin-left:auto;background:none;border:none;color:#b90053;cursor:pointer;font-weight:900;padding:2px 6px}
 </style>
 </head>
 <body>
@@ -153,21 +199,75 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900}
       </button>
       <div class="pop" id="friPop"><div class="pop-list" id="friList"></div></div>
     </div>
+    <span id="adminControls" style="display:none;gap:8px;align-items:center">
+      <button class="admin-pill" id="spiffBtn">+ Spiff</button>
+      <button class="admin-pill" id="ratesBtn">Rates</button>
+    </span>
     <div class="freshness" id="freshness">Loading…</div>
+    <button class="admin-link" id="adminLink" title="Admin">Admin</button>
   </div>
   <div id="content"></div>
+</div>
+
+<!-- admin: add spiff -->
+<div class="modal-veil" id="spiffVeil">
+  <div class="modal">
+    <h3>Add Spiff</h3>
+    <label>Agent</label>
+    <select id="spAgent"></select>
+    <div class="row2">
+      <div><label>Amount ($)</label><input id="spAmount" type="number" min="1" step="1" placeholder="25" /></div>
+      <div><label>Date won</label><input id="spDate" type="date" /></div>
+    </div>
+    <label>Note</label>
+    <input id="spNote" placeholder="Daily contest — most sets" />
+    <div class="btns">
+      <button class="ghost" data-close>Cancel</button>
+      <button class="primary" id="spSave">Add Spiff</button>
+    </div>
+    <div class="msg" id="spMsg"></div>
+    <div class="spiff-list" id="spiffList"></div>
+  </div>
+</div>
+
+<!-- admin: rates -->
+<div class="modal-veil" id="ratesVeil">
+  <div class="modal">
+    <h3>Pay Rates</h3>
+    <div class="row2">
+      <div><label>Set bonus ($)</label><input id="cfg_set_bonus" type="number" step="0.01" /></div>
+      <div><label>Sit bonus ($)</label><input id="cfg_sit_bonus" type="number" step="0.01" /></div>
+    </div>
+    <div class="row2">
+      <div><label>Sit rate (%)</label><input id="cfg_sit_rate" type="number" step="1" /></div>
+      <div><label>Close rate (%)</label><input id="cfg_close_rate" type="number" step="0.1" /></div>
+    </div>
+    <div class="row2">
+      <div><label>Avg project ($)</label><input id="cfg_avg_project" type="number" step="1" /></div>
+      <div><label>Rev share (%)</label><input id="cfg_rev_share" type="number" step="0.01" /></div>
+    </div>
+    <div class="btns">
+      <button class="ghost" data-close>Cancel</button>
+      <button class="primary" id="cfgSave">Save Rates</button>
+    </div>
+    <div class="msg" id="cfgMsg"></div>
+  </div>
 </div>
 
 <script>
 "use strict";
 
-/* -------- pay constants (Contact Center Agent Payroll doc, Jun 1 2026+) -------- */
-const SET_BONUS = 5.0;
-const SIT_BONUS = 5.0;
-const SIT_RATE = 0.60;
-const CLOSE_RATE = 0.04;
-const AVG_PROJECT = 15274;
-const REV_SHARE = 0.001;
+/* -------- pay config (defaults from the Jun 1 2026 payroll doc) --------
+   Overridden by leads.cc_config via the API when present — editable in
+   the admin Rates panel without a deploy. */
+const CFG = {
+  set_bonus: 5.0,
+  sit_bonus: 5.0,
+  sit_rate: 0.60,
+  close_rate: 0.04,
+  avg_project: 15274,
+  rev_share: 0.001,
+};
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -183,7 +283,7 @@ const money = n => "$" + n.toLocaleString(undefined,{minimumFractionDigits:2,max
 
 // Pay buckets for a given Friday (doc Part 3):
 //   sets   = previous full week, Mon–Sun
-//   sits   = two weeks ago, Mon–Sun (paid at SIT_RATE)
+//   sits   = two weeks ago, Mon–Sun (paid at CFG.sit_rate)
 function buckets(fridayIso){
   const f = parse(fridayIso);
   const monThis = addDays(f, -((f.getDay()+6)%7));   // Monday of Friday's week
@@ -220,6 +320,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
+    Object.assign(CFG, j.config || {});   // admin-tuned rates override defaults
     buildFridays();
     renderFreshness();
   }catch(e){ S.err = String(e.message||e); }
@@ -287,9 +388,16 @@ function compute(){
   const sits = countInRange(rows, bk.sits[0], bk.sits[1]);
   const comm = ci ? countInRange(rows, ci.start, ci.end) : null;
 
+  // spiffs awarded during the sets window pay out on this Friday
+  const spiffPer = {};
+  for(const [id,u,amt,note,d] of (S.data.spiffs||[])){
+    if(d >= bk.sets[0] && d <= bk.sets[1]) spiffPer[u] = (spiffPer[u]||0) + amt;
+  }
+
   const users = new Set([
     ...Object.keys(S.data.agents),
     ...Object.keys(sets.per), ...Object.keys(sits.per),
+    ...Object.keys(spiffPer),
     ...(comm?Object.keys(comm.per):[]),
   ]);
 
@@ -297,19 +405,20 @@ function compute(){
   for(const u of users){
     const nSets = sets.per[u]||0;
     const sitBase = sits.per[u]||0;
-    const nSits = Math.round(sitBase * SIT_RATE);
-    const setPay = nSets * SET_BONUS;
-    const sitPay = nSits * SIT_BONUS;
+    const nSits = Math.round(sitBase * CFG.sit_rate);
+    const setPay = nSets * CFG.set_bonus;
+    const sitPay = nSits * CFG.sit_bonus;
     let commPay = 0, commAppts = 0;
     if(comm){
       commAppts = comm.per[u]||0;
-      commPay = commAppts * CLOSE_RATE * AVG_PROJECT * REV_SHARE;
+      commPay = commAppts * CFG.close_rate * CFG.avg_project * CFG.rev_share;
     }
-    const total = setPay + sitPay + commPay;
-    if(nSets===0 && sitBase===0 && commAppts===0) continue;
+    const spiff = spiffPer[u]||0;
+    const total = setPay + sitPay + commPay + spiff;
+    if(nSets===0 && sitBase===0 && commAppts===0 && spiff===0) continue;
     perAgent.push({
       user:u, name:S.data.agents[u]||u,
-      nSets, setPay, sitBase, nSits, sitPay, commAppts, commPay, total,
+      nSets, setPay, sitBase, nSits, sitPay, commAppts, commPay, spiff, total,
     });
   }
   perAgent.sort((a,b)=>b.total-a.total);
@@ -395,6 +504,7 @@ function tableCard(R){
       <td class="r mono">${x.nSits} <span class="sub">of ${x.sitBase}</span></td>
       <td class="r mono">${money(x.sitPay)}</td>
       ${R.ci?`<td class="r mono">${x.commAppts}</td><td class="r mono">${money(x.commPay)}</td>`:""}
+      <td class="r mono">${x.spiff?money(x.spiff):"—"}</td>
       <td class="r"><span class="total-pill mono">${money(x.total)}</span></td>
     </tr>`).join("");
 
@@ -405,12 +515,14 @@ function tableCard(R){
       <td class="r mono">${R.unSits}</td><td class="r mono">—</td>
       ${R.ci?`<td class="r mono">${R.unComm}</td><td class="r mono">—</td>`:""}
       <td class="r mono">—</td>
+      <td class="r mono">—</td>
     </tr>` : "";
 
   const t = {
     sets:R.perAgent.reduce((a,x)=>a+x.nSets,0), setPay:R.perAgent.reduce((a,x)=>a+x.setPay,0),
     sits:R.perAgent.reduce((a,x)=>a+x.nSits,0), sitPay:R.perAgent.reduce((a,x)=>a+x.sitPay,0),
     commA:R.perAgent.reduce((a,x)=>a+x.commAppts,0), comm:R.perAgent.reduce((a,x)=>a+x.commPay,0),
+    spiff:R.perAgent.reduce((a,x)=>a+x.spiff,0),
     grand:R.perAgent.reduce((a,x)=>a+x.total,0),
   };
 
@@ -424,14 +536,16 @@ function tableCard(R){
         <th>Agent</th><th class="r">Sets</th><th class="r">Set $</th>
         <th class="r">Sits</th><th class="r">Sit $</th>
         ${R.ci?'<th class="r">Mo. Appts</th><th class="r">Commission</th>':""}
+        <th class="r">Spiff</th>
         <th class="r">Friday Total</th>
       </tr></thead>
-      <tbody>${rows || `<tr><td colspan="9" class="sub" style="padding:30px;text-align:center">No appointments in these windows.</td></tr>`}${un}</tbody>
+      <tbody>${rows || `<tr><td colspan="10" class="sub" style="padding:30px;text-align:center">No appointments in these windows.</td></tr>`}${un}</tbody>
       <tfoot><tr>
         <td>Total</td>
         <td class="r mono">${t.sets}</td><td class="r mono">${money(t.setPay)}</td>
         <td class="r mono">${t.sits}</td><td class="r mono">${money(t.sitPay)}</td>
         ${R.ci?`<td class="r mono">${t.commA}</td><td class="r mono">${money(t.comm)}</td>`:""}
+        <td class="r mono">${t.spiff?money(t.spiff):"—"}</td>
         <td class="r mono">${money(t.grand)}</td>
       </tr></tfoot>
     </table>
@@ -450,6 +564,126 @@ friBtn.onclick = (e)=>{
 };
 document.addEventListener("click", (e)=>{ if(!friPop.contains(e.target)) closePop(); });
 document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closePop(); });
+
+/* ------------------------------------------------------------------ admin */
+const A = { pc: sessionStorage.getItem("cc_admin_pc") || "" };
+
+function showAdminControls(){
+  document.getElementById("adminControls").style.display = A.pc ? "inline-flex" : "none";
+  document.getElementById("adminLink").textContent = A.pc ? "Lock" : "Admin";
+}
+
+document.getElementById("adminLink").onclick = ()=>{
+  if(A.pc){ A.pc=""; sessionStorage.removeItem("cc_admin_pc"); showAdminControls(); return; }
+  const pc = prompt("Admin passcode:");
+  if(!pc) return;
+  A.pc = pc; sessionStorage.setItem("cc_admin_pc", pc); showAdminControls();
+};
+
+function openVeil(id){ document.getElementById(id).classList.add("open"); }
+function closeVeils(){ document.querySelectorAll(".modal-veil").forEach(v=>v.classList.remove("open")); }
+document.querySelectorAll("[data-close]").forEach(b=> b.onclick = closeVeils);
+document.querySelectorAll(".modal-veil").forEach(v=> v.addEventListener("click", e=>{ if(e.target===v) closeVeils(); }));
+
+async function adminPost(path, payload, msgEl){
+  const el = document.getElementById(msgEl);
+  el.className = "msg";
+  const r = await fetch(path, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ admin: A.pc, ...payload }),
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.error){
+    el.textContent = j.error || `HTTP ${r.status}`; el.className = "msg bad";
+    return false;
+  }
+  return true;
+}
+
+async function reloadData(){
+  const r = await fetch("/api/data?refresh=1", { cache:"no-store" });
+  const j = await r.json();
+  if(r.ok && !j.error){ S.data = j; Object.assign(CFG, j.config||{}); render(); }
+}
+
+/* ---- spiff dialog ---- */
+function renderSpiffList(){
+  const list = document.getElementById("spiffList");
+  const rows = (S.data && S.data.spiffs || []).slice(0, 12);
+  list.innerHTML = rows.length
+    ? "<label>Recent spiffs</label>" + rows.map(([id,u,amt,note,d])=>`
+        <div class="spiff-row">
+          <span>${esc(d)}</span>
+          <span style="font-weight:850">${esc((S.data.agents||{})[u]||u)}</span>
+          <span class="mono">${money(amt)}</span>
+          <span class="sub">${esc(note)}</span>
+          <button class="del" data-id="${esc(id)}" title="Delete">×</button>
+        </div>`).join("")
+    : "";
+  list.querySelectorAll(".del").forEach(b=> b.onclick = async ()=>{
+    if(!confirm("Delete this spiff?")) return;
+    if(await adminPost("/api/spiff/delete", { id: b.dataset.id }, "spMsg")){
+      await reloadData(); renderSpiffList();
+    }
+  });
+}
+
+document.getElementById("spiffBtn").onclick = ()=>{
+  const sel = document.getElementById("spAgent");
+  sel.innerHTML = Object.entries(S.data.agents||{})
+    .map(([u,n])=>`<option value="${esc(u)}">${esc(n)}</option>`).join("");
+  const today = new Date();
+  document.getElementById("spDate").value = iso(today);
+  document.getElementById("spMsg").className = "msg";
+  renderSpiffList();
+  openVeil("spiffVeil");
+};
+
+document.getElementById("spSave").onclick = async ()=>{
+  const ok = await adminPost("/api/spiff", {
+    agent_user: document.getElementById("spAgent").value,
+    amount: Number(document.getElementById("spAmount").value),
+    award_date: document.getElementById("spDate").value,
+    note: document.getElementById("spNote").value,
+  }, "spMsg");
+  if(ok){
+    const el = document.getElementById("spMsg");
+    el.textContent = "Spiff added."; el.className = "msg ok";
+    document.getElementById("spAmount").value = ""; document.getElementById("spNote").value = "";
+    await reloadData(); renderSpiffList();
+  }
+};
+
+/* ---- rates dialog ---- */
+document.getElementById("ratesBtn").onclick = ()=>{
+  document.getElementById("cfg_set_bonus").value = CFG.set_bonus;
+  document.getElementById("cfg_sit_bonus").value = CFG.sit_bonus;
+  document.getElementById("cfg_sit_rate").value = Math.round(CFG.sit_rate*100);
+  document.getElementById("cfg_close_rate").value = +(CFG.close_rate*100).toFixed(2);
+  document.getElementById("cfg_avg_project").value = CFG.avg_project;
+  document.getElementById("cfg_rev_share").value = +(CFG.rev_share*100).toFixed(3);
+  document.getElementById("cfgMsg").className = "msg";
+  openVeil("ratesVeil");
+};
+
+document.getElementById("cfgSave").onclick = async ()=>{
+  const num = id => Number(document.getElementById(id).value);
+  const ok = await adminPost("/api/config", { values: {
+    set_bonus: num("cfg_set_bonus"),
+    sit_bonus: num("cfg_sit_bonus"),
+    sit_rate: num("cfg_sit_rate")/100,
+    close_rate: num("cfg_close_rate")/100,
+    avg_project: num("cfg_avg_project"),
+    rev_share: num("cfg_rev_share")/100,
+  }}, "cfgMsg");
+  if(ok){
+    const el = document.getElementById("cfgMsg");
+    el.textContent = "Rates saved — recalculated."; el.className = "msg ok";
+    await reloadData();
+  }
+};
+
+showAdminControls();
 
 load();
 </script>
