@@ -24,5 +24,5 @@
 
 ## Reference
 
-- Live: https://cc-dashboard.michael-5fa.workers.dev (passcode: homelynk2026)
+- Live: https://cc-dashboard.michael-5fa.workers.dev (passcode: dialerportal0987)
 - Build chat: https://claude.ai/cowork/cse_01G9RPR1XJfihMy8gmFT5Jc6
