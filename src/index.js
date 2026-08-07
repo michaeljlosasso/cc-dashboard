@@ -266,11 +266,17 @@ LEFT JOIN users u ON u.fn = COALESCE(p.set_by_id, p.set_by_phone)
 ORDER BY booked_date
 `;
 
+// Hours = actual logged-in time: talk + wait + pause + dispo + dead seconds.
+// Paused breaks (LUNCH/BRK/ADMIN) count; logged-out time does not. Capped at
+// the day's first-to-last span so overlapping timers can't overpay.
 const SQL_HOURS = `
 SELECT
   a.user,
   FORMAT_DATE('%Y-%m-%d', DATE(a.event_time)) AS d,
-  ROUND(TIMESTAMP_DIFF(MAX(a.event_time), MIN(a.event_time), SECOND)/3600.0, 2) AS login_hours,
+  ROUND(LEAST(
+    SUM(IFNULL(a.pause_sec,0)+IFNULL(a.wait_sec,0)+IFNULL(a.talk_sec,0)+IFNULL(a.dispo_sec,0)+IFNULL(a.dead_sec,0)),
+    TIMESTAMP_DIFF(MAX(a.event_time), MIN(a.event_time), SECOND)
+  )/3600.0, 2) AS login_hours,
   COUNT(DISTINCT a.uniqueid) AS calls
 FROM \`${PROJECT}.vicidial.vicidial_agent_log\` a
 WHERE REGEXP_CONTAINS(a.user, r'${AGENT_RE}') AND a.user NOT IN ${EXCLUDED_USERS}
