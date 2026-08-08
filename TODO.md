@@ -17,7 +17,7 @@
 
 ## Parked
 
-- [ ] Create GitHub repo `michaeljlosasso/cc-dashboard` and push (commits queued locally in the build session)
+- [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
 - [ ] Leaderboard sub-widget (agent-facing rankings)
 - [ ] Spiffs / contests sub-widget
 - [ ] Confirm commission-month interpretation with partner: dashboard pays **prior full month** on the first Friday ≥ 5th (doc's literal text said "current month")
