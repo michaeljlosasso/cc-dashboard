@@ -167,7 +167,7 @@ const SQL_APPTS = `
 WITH sold AS (
   SELECT leadID,
          REGEXP_REPLACE(phone_home, r'\\D', '') AS ph,
-         createdOn, sold,
+         createdOn, sold, phone_home, email_address,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
@@ -193,7 +193,9 @@ SELECT
   ANY_VALUE(s.last_name) AS last_name,
   ANY_VALUE(s.city) AS city,
   ANY_VALUE(s.state) AS state,
-  ANY_VALUE(s.sold) AS sold
+  ANY_VALUE(s.sold) AS sold,
+  ANY_VALUE(s.phone_home) AS phone,
+  ANY_VALUE(s.email_address) AS email
 FROM sold s
 LEFT JOIN agent_calls c ON c.ph = s.ph
 GROUP BY s.leadID, s.createdOn
@@ -206,7 +208,7 @@ const SQL_APPTS_V2 = `
 WITH sold AS (
   SELECT leadID,
          REGEXP_REPLACE(phone_home, r'\\D', '') AS ph,
-         createdOn, sold,
+         createdOn, sold, phone_home, email_address,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
@@ -244,6 +246,8 @@ picked AS (
     ANY_VALUE(s.city) AS city,
     ANY_VALUE(s.state) AS state,
     ANY_VALUE(s.sold) AS sold,
+    ANY_VALUE(s.phone_home) AS phone,
+    ANY_VALUE(s.email_address) AS email,
     ARRAY_AGG(mi.setter_key IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] AS set_by_id,
     ARRAY_AGG(mp.setter_key IGNORE NULLS
       ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), SECOND))
@@ -262,7 +266,7 @@ picked AS (
 SELECT
   FORMAT_DATETIME('%Y-%m-%d', p.createdOn) AS booked_date,
   COALESCE(u.user, p.call_user) AS agent_user,
-  p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold
+  p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold, p.phone, p.email
 FROM picked p
 LEFT JOIN users u ON u.fn = COALESCE(p.set_by_id, p.set_by_phone)
 ORDER BY booked_date
@@ -360,7 +364,7 @@ async function buildPayload(env) {
     generated_at: new Date().toISOString(),
     meta: { last_sync: (meta.rows[0] || [])[0] || null },
     agents: agentMap,
-    // [booked_date, agent_user|null, campaign, first, last, city, state, sold]
+    // [booked_date, agent_user|null, campaign, first, last, city, state, sold, phone, email]
     appts: appts.rows,
     // [user, date, login_hours, calls]
     hours: hours.rows.map((r) => [r[0], r[1], Number(r[2]), Number(r[3])]),

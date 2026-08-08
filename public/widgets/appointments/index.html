@@ -288,6 +288,8 @@ function tableCard(rows){
       <td class="mono">${fmt(r[0])}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td>${esc(r[3])} ${esc(r[4])}</td>
+      <td class="mono">${esc(r[8]||"—")}</td>
+      <td class="sub">${esc(r[9]||"—")}</td>
       <td class="sub">${esc(r[2])}</td>
       <td>${esc(r[5])}${r[6]?`, ${esc(r[6])}`:""}</td>
     </tr>`).join("");
@@ -298,8 +300,8 @@ function tableCard(rows){
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
-      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Campaign</th><th>Location</th></tr></thead>
-      <tbody>${body || `<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="7" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
     ${pages>1?`<div class="pager">
