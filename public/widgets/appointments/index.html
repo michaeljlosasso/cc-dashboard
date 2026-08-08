@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Appointments</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ll-green:#00b580; --ll-magenta:#f40070; --ll-purple:#8a56f3;
+  --ll-cyan:#00c5ff;  --ll-yellow:#ffd900;  --ll-black:#191718;
+  --ll-surface:#f9fafb; --ll-border:#e5e7eb;
+  --muted:#6b7280; --dim:#a1a1aa;
+  --card-shadow:0 1px 3px rgba(25,23,24,.08), 0 16px 36px rgba(25,23,24,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Nunito",system-ui,sans-serif; color:var(--ll-black);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0,197,255,.06), transparent 28%),
+    linear-gradient(180deg,#fff 0%, #f9fafb 34%, #f6f7f8 100%);
+  min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1440px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{
+  border:1px solid rgba(229,231,235,.92); background:rgba(255,255,255,.94);
+  box-shadow:var(--card-shadow); border-radius:14px; padding:18px;
+  animation:fadeUp 260ms ease both;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:6px;color:#0094aa;
+  font-family:"Outfit",sans-serif;font-size:.72rem;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px;
+}
+.card-h{font-family:"Nunito";font-size:1.08rem;font-weight:850;line-height:1.05;margin:0 0 2px}
+.card-sub{font-size:.87rem;color:var(--muted);font-weight:700;margin:0}
+.filter-bar{
+  border:1px solid rgba(229,231,235,.92); border-radius:18px;
+  background:rgba(255,255,255,.96); box-shadow:var(--card-shadow);
+  padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  position:relative; z-index:40; animation:fadeUp 260ms ease both;
+}
+.filter-control{
+  display:inline-flex;align-items:center;gap:9px;min-height:40px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;
+  color:var(--ll-black);font-family:"Nunito",sans-serif;font-size:.93rem;
+  font-weight:850;padding:0 16px;box-shadow:0 1px 2px rgba(25,23,24,.04);
+  cursor:pointer;transition:border-color 160ms ease,box-shadow 160ms ease;white-space:nowrap;
+}
+.filter-control:hover,.filter-control[aria-expanded="true"]{
+  border-color:rgba(138,86,243,.62); box-shadow:0 7px 18px rgba(138,86,243,.08);
+}
+.filter-control .chev{transition:transform 160ms ease;color:#9ca3af}
+.filter-control[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.freshness{margin-left:auto;font-size:.78rem;font-weight:700;color:var(--muted)}
+.pop-wrap{position:relative}
+.pop{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:60;display:none;
+  width:min(300px,calc(100vw - 48px));border:1px solid rgba(229,231,235,.94);
+  border-radius:13px;background:#fff;
+  box-shadow:0 22px 54px rgba(25,23,24,.14),0 2px 8px rgba(25,23,24,.08);overflow:hidden;
+}
+.pop.open{display:block}
+.pop-list{max-height:340px;overflow:auto;padding:8px}
+.pop-item{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;
+  cursor:pointer;font-size:.9rem;font-weight:750;color:#3f3f46;
+  transition:background 140ms ease;
+}
+.pop-item:hover{background:#f4f4f5}
+.pop-item.on{background:rgba(0,197,255,.12);color:#0094aa;font-weight:850}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.metric-card{position:relative;overflow:hidden}
+.metric-card::after{
+  content:"";position:absolute;right:-22px;bottom:-38px;width:112px;height:112px;
+  border-radius:999px;opacity:.09;background:currentColor;pointer-events:none;
+}
+.mc-top{display:flex;align-items:flex-start;justify-content:space-between}
+.badge{
+  width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:color-mix(in srgb,currentColor 12%,white);
+}
+.chip{display:inline-flex;align-items:center;gap:2px;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:850}
+.chip.active{color:#007e5c;background:rgba(0,181,128,.10)}
+.mc-label{
+  font-family:"Nunito";font-size:.82rem;font-weight:850;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);margin-top:14px;
+}
+.mc-value{
+  font-family:"Outfit",sans-serif;font-size:clamp(1.65rem,2.4vw,2.35rem);
+  font-weight:900;line-height:1;margin-top:2px;
+}
+.mc-help{font-family:"Nunito";font-size:.87rem;font-weight:700;color:var(--muted);margin-top:6px}
+.c-cyan{color:var(--ll-cyan)} .c-green{color:var(--ll-green)}
+.c-purple{color:var(--ll-purple)} .c-yellow{color:#d09f00}
+.tbl-scroll{overflow:auto;margin:0 -18px;padding:0 18px}
+table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
+thead th{
+  text-align:left;font-size:.7rem;font-weight:900;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);padding:0 12px 10px;white-space:nowrap;
+}
+thead th.r, td.r{text-align:right}
+tbody td{padding:11px 12px;border-top:1px solid #f1f2f4;white-space:nowrap}
+tbody tr:hover{background:#fafafa}
+.mono{font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);font-weight:700;font-size:.78rem}
+.agent-name{font-weight:850}
+.pill-status{display:inline-block;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:850}
+.s-sold{color:#007e5c;background:rgba(0,181,128,.10)}
+.s-unsold{color:#8a6d00;background:rgba(255,217,0,.16)}
+.pager{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:.82rem;font-weight:750;color:var(--muted)}
+.pager button{
+  border:1px solid var(--ll-border);background:#fff;border-radius:8px;padding:6px 12px;
+  font-family:"Nunito";font-weight:850;font-size:.82rem;cursor:pointer;color:var(--ll-black);
+}
+.pager button:disabled{opacity:.4;cursor:default}
+.err{
+  border:1px solid rgba(244,0,112,.3);background:rgba(244,0,112,.05);color:#b90053;
+  border-radius:14px;padding:18px;font-weight:750;
+}
+.skel{
+  background:linear-gradient(90deg,#f1f2f4 25%,#e9eaec 50%,#f1f2f4 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px;
+}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="filter-bar">
+    <div class="pop-wrap">
+      <button class="filter-control" id="wkBtn" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span id="wkLabel">—</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="wkPop"><div class="pop-list" id="wkList"></div></div>
+    </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="agBtn" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span id="agLabel">All Agents</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="agPop"><div class="pop-list" id="agList"></div></div>
+    </div>
+    <div class="freshness" id="freshness">Loading…</div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+"use strict";
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const PAGE = 50;
+const S = { data:null, err:null, week:null, weeks:[], agent:"", page:1 };
+
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const fmt = s => { const d=parse(s); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mondayOf = d => addDays(d, -((d.getDay()+6)%7));
+
+async function load(){
+  try{
+    const r = await fetch("/api/data", { cache:"no-store" });
+    if(r.status===401){ parent.location.href="/login"; return; }
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    S.data = j;
+    buildWeeks(); buildAgents();
+    const m = j.meta;
+    if(m && m.last_sync){
+      const t = new Date(m.last_sync);
+      document.getElementById("freshness").textContent =
+        "Data synced " + t.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+    }
+  }catch(e){ S.err = String(e.message||e); }
+  render();
+}
+
+function buildWeeks(){
+  const dates = S.data.appts.map(r=>r[0]).sort();
+  if(!dates.length) return;
+  let m = mondayOf(parse(dates[0]));
+  const lastM = mondayOf(new Date());
+  const out=[];
+  while(m <= lastM){ out.push(iso(m)); m = addDays(m,7); }
+  S.weeks = out.reverse();
+  S.week = S.weeks[0]; // current week by default — agents watch it fill up live
+  const list = document.getElementById("wkList");
+  list.innerHTML = S.weeks.map(w=>`
+    <div class="pop-item${w===S.week?" on":""}" data-w="${w}">
+      Week of ${fmt(w)} – ${fmt(iso(addDays(parse(w),6)))}
+    </div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.week = el.dataset.w; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.w===S.week));
+      document.getElementById("wkLabel").textContent = `Week of ${fmt(S.week)} – ${fmt(iso(addDays(parse(S.week),6)))}`;
+      closePops(); render();
+    };
+  });
+  document.getElementById("wkLabel").textContent = `Week of ${fmt(S.week)} – ${fmt(iso(addDays(parse(S.week),6)))}`;
+}
+
+function buildAgents(){
+  const list = document.getElementById("agList");
+  const opts = [["","All Agents"], ...Object.entries(S.data.agents)];
+  list.innerHTML = opts.map(([u,n])=>`
+    <div class="pop-item${u===S.agent?" on":""}" data-u="${esc(u)}">${esc(n)}</div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.agent = el.dataset.u; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.u===S.agent));
+      document.getElementById("agLabel").textContent = S.agent ? (S.data.agents[S.agent]||S.agent) : "All Agents";
+      closePops(); render();
+    };
+  });
+}
+
+function filtered(){
+  const a = S.week, b = iso(addDays(parse(S.week),6));
+  return S.data.appts.filter(r =>
+    r[0] >= a && r[0] <= b && (!S.agent || r[1] === S.agent)
+  ).sort((x,y)=> y[0] < x[0] ? -1 : y[0] > x[0] ? 1 : 0);
+}
+
+function render(){
+  const c = document.getElementById("content");
+  if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load appointments.</strong><br>${esc(S.err)}</div>`; return; }
+  if(!S.data){
+    c.innerHTML = `<div class="kpi-row">${'<div class="card skel" style="height:150px"></div>'.repeat(3)}</div>
+      <div class="card skel" style="height:300px;margin-top:14px"></div>`;
+    return;
+  }
+  const rows = filtered();
+  c.innerHTML = kpis(rows) + tableCard(rows);
+  wirePager(rows);
+}
+
+function kpis(rows){
+  const total = rows.length;
+  const perAgent = {};
+  rows.forEach(r=>{ if(r[1]) perAgent[r[1]]=(perAgent[r[1]]||0)+1; });
+  const top = Object.entries(perAgent).sort((a,b)=>b[1]-a[1])[0];
+  const days = {}; rows.forEach(r=>{ days[r[0]]=(days[r[0]]||0)+1; });
+  const nDays = Math.max(1, Object.keys(days).length);
+
+  const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const tile = (cls,icon,label,value,help,chip) => `
+    <div class="card metric-card ${cls}">
+      <div class="mc-top"><div class="badge">${icon}</div>${chip||""}</div>
+      <div class="mc-label">${label}</div>
+      <div class="mc-value">${value}</div>
+      <div class="mc-help">${help}</div>
+    </div>`;
+
+  return `<div class="kpi-row">
+    ${tile("c-cyan", ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/>'),
+      "Appointments", total.toLocaleString(),
+      `${Math.round(total/nDays*10)/10} per day`,
+      '<span class="chip active">↗ Active</span>')}
+    ${tile("c-green", ic('<path d="M20 6L9 17l-5-5"/>'),
+      "Today", (days[iso(new Date())]||0).toLocaleString(),
+      "appointments booked today")}
+    ${tile("c-purple", ic('<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z"/>'),
+      "Top Setter", top ? esc(S.data.agents[top[0]]||top[0]).split(" ")[0] : "—",
+      top ? `${top[1]} appointment${top[1]===1?"":"s"} this week` : "no appointments yet")}
+  </div>`;
+}
+
+function tableCard(rows){
+  const start = (S.page-1)*PAGE;
+  const page = rows.slice(start, start+PAGE);
+  const body = page.map(r=>`
+    <tr>
+      <td class="mono">${fmt(r[0])}</td>
+      <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
+      <td>${esc(r[3])} ${esc(r[4])}</td>
+      <td class="sub">${esc(r[2])}</td>
+      <td>${esc(r[5])}${r[6]?`, ${esc(r[6])}`:""}</td>
+    </tr>`).join("");
+  const pages = Math.max(1, Math.ceil(rows.length/PAGE));
+  return `<div class="card">
+    <div class="eyebrow">Appointment Log</div>
+    <h2 class="card-h">Every Appointment — Week of ${fmt(S.week)}</h2>
+    <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Campaign</th><th>Location</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="5" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+    </table>
+    </div>
+    ${pages>1?`<div class="pager">
+      <button id="pgPrev" ${S.page<=1?"disabled":""}>‹ Prev</button>
+      <span>Page ${S.page} of ${pages}</span>
+      <button id="pgNext" ${S.page>=pages?"disabled":""}>Next ›</button>
+    </div>`:""}
+  </div>`;
+}
+
+function wirePager(rows){
+  const prev = document.getElementById("pgPrev"), next = document.getElementById("pgNext");
+  if(prev) prev.onclick = ()=>{ S.page--; render(); };
+  if(next) next.onclick = ()=>{ S.page++; render(); };
+}
+
+function closePops(){
+  document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
+  document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
+}
+[["wkBtn","wkPop"],["agBtn","agPop"]].forEach(([b,p])=>{
+  const btn=document.getElementById(b), pop=document.getElementById(p);
+  btn.onclick = (e)=>{
+    e.stopPropagation();
+    const wasOpen = pop.classList.contains("open");
+    closePops();
+    if(!wasOpen){ pop.classList.add("open"); btn.setAttribute("aria-expanded","true"); }
+  };
+});
+document.addEventListener("click", closePops);
+document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closePops(); });
+
+load();
+</script>
+</body>
+</html>
