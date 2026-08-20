@@ -173,9 +173,9 @@ const NAV_SECTIONS = [
   {
     label: "Tools", color: "#f9a825", defaultOpen: true,
     items: [
-      { icon: "pin", label: "Zips", path: "https://ziplookup-xc3ad9mb.manus.space/?code=cSzUcUm83SsyPctjSAQwLP",
+      { icon: "pin", label: "Zips", path: "https://llmedia-zip-lookup-widget.michael-5fa.workers.dev/?code=cSzUcUm83SsyPctjSAQwLP",
         sub: "Zip code lookup",
-        chat: "https://manus.im/app/XgmE2bZlCYT1urvAbJ1tjW" },
+        chat: "https://github.com/michaeljlosasso/llmedia-zip-lookup-widget" },
     ],
   },
   {
@@ -238,7 +238,8 @@ function select(item, btn, secColor){
     return;
   }
   holder.innerHTML = `<iframe src="${item.path}" title="${item.label}"></iframe>`;
-  try { history.replaceState(null, "", "#" + item.path.replace(/\W+/g, "-").replace(/^-|-$/g, "")); } catch(_){}
+  // Slug from the label, not the path — external widget URLs made ugly hashes.
+  try { history.replaceState(null, "", "#" + item.label.toLowerCase().replace(/\W+/g, "-")); } catch(_){}
 }
 
 // initial page — honor #hours deep link
