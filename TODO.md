@@ -15,12 +15,26 @@
   - Payroll widget: past Fridays load from snapshot; current/future stay live-calculated
   - Est: ~10–15 min build
 
+- [ ] **Auto same/next-day spiffs** — blocked on the Make module above
+  - Once `appointment_date` flows in from Make, compute same/next-day ($5 each) automatically
+  - Retires the manual weekly spiff paste
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
 - [ ] Leaderboard sub-widget (agent-facing rankings)
 - [ ] Spiffs / contests sub-widget
 - [ ] Confirm commission-month interpretation with partner: dashboard pays **prior full month** on the first Friday ≥ 5th (doc's literal text said "current month")
+- [ ] Optional: move shell to cc.llmedia.info (nicer URL for agents; makes widgets same-site if Access is ever wanted)
+
+## Sub-widgets
+
+| Page | Source | Notes |
+|---|---|---|
+| Commission | in-repo `/widgets/payroll/` | admin: +Spiff, Rates |
+| Hours | in-repo `/widgets/hours/` | logged-in time only; breaks card |
+| Appointments | in-repo `/widgets/appointments/` | no revenue data shown |
+| Zips | `llmedia-zip-lookup-widget.michael-5fa.workers.dev` | migrated off Manus Aug 20; `?code=` gate |
 
 ## Reference
 
