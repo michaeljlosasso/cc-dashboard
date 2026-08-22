@@ -158,6 +158,16 @@ const SETTER_ALIAS_SQL = `
     ELSE LOWER(TRIM(setter))
   END`;
 
+// Junk/test leads that must never reach payroll. Leadspedia's own isTest flag
+// misses these — they post as real leads with a placeholder name or from an
+// internal phone. Found Aug 22 2026: two "n a" rows on 4013013422 (Manny's own
+// number) on Aug 15 were paying Felix $10 he never earned.
+const TEST_PHONES = "('4013013422')";
+const JUNK_LEAD_SQL = `
+    AND REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', '') NOT IN ${TEST_PHONES}
+    AND LOWER(TRIM(CONCAT(IFNULL(first_name,''), ' ', IFNULL(last_name,''))))
+        NOT IN ('n a', 'na', 'test test', 'test', 'a a')`;
+
 // Appointments = sold affiliate-212 (HomeLynk CC) leads. appt_setter is not
 // synced to BigQuery, so attribution priority is:
 //   1. leads.appt_setter_map (CSV backfill by leadID, Make rows by phone+date)
@@ -171,7 +181,7 @@ WITH sold AS (
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
-    AND createdOnDate >= '2026-01-01'
+    AND createdOnDate >= '2026-01-01'${JUNK_LEAD_SQL}
 ),
 agent_calls AS (
   SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
@@ -212,7 +222,7 @@ WITH sold AS (
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
-    AND createdOnDate >= '2026-01-01'
+    AND createdOnDate >= '2026-01-01'${JUNK_LEAD_SQL}
 ),
 map AS (
   SELECT leadID AS map_lead_id,
