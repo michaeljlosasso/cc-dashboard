@@ -112,6 +112,15 @@ tbody tr:hover{background:#fafafa}
 .pill-status{display:inline-block;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:850}
 .s-sold{color:#007e5c;background:rgba(0,181,128,.10)}
 .s-unsold{color:#8a6d00;background:rgba(255,217,0,.16)}
+/* duplicate = same phone booked twice on the same day */
+tbody tr.dup{background:rgba(244,0,112,.055)}
+tbody tr.dup:hover{background:rgba(244,0,112,.09)}
+.dup-tag{
+  display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
+  font-size:.68rem;font-weight:900;letter-spacing:.02em;
+  color:#b90053;background:rgba(244,0,112,.11);vertical-align:1px;
+}
+.dup-tag.cross{color:#fff;background:var(--ll-magenta)}
 .pager{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:.82rem;font-weight:750;color:var(--muted)}
 .pager button{
   border:1px solid var(--ll-border);background:#fff;border-radius:8px;padding:6px 12px;
@@ -152,6 +161,16 @@ tbody tr:hover{background:#fafafa}
       </button>
       <div class="pop" id="agPop"><div class="pop-list" id="agList"></div></div>
     </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="dpBtn" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span id="dpLabel">All Appointments</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="dpPop"><div class="pop-list" id="dpList"></div></div>
+    </div>
     <div class="freshness" id="freshness">Loading…</div>
   </div>
   <div id="content"></div>
@@ -162,7 +181,26 @@ tbody tr:hover{background:#fafafa}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", page:1 };
+// dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
+// "cross" = the same homeowner credited to two different setters that day,
+// which is the case that actually pays twice for one lead.
+const DUP = new Map();
+const dupKey = r => `${r[0]}|${String(r[8]||"").replace(/\D/g,"")}`;
+
+function buildDupes(){
+  DUP.clear();
+  S.data.appts.forEach(r=>{
+    const ph = String(r[8]||"").replace(/\D/g,"");
+    if(ph.length < 7) return;            // no phone -> can't call it a duplicate
+    const k = dupKey(r);
+    let e = DUP.get(k);
+    if(!e){ e = { n:0, agents:new Set() }; DUP.set(k, e); }
+    e.n++; if(r[1]) e.agents.add(r[1]);
+  });
+  for(const [k,e] of DUP) if(e.n < 2) DUP.delete(k);
+}
+const dupOf = r => DUP.get(dupKey(r)) || null;
 
 const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
@@ -178,7 +216,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildWeeks(); buildAgents();
+    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -229,11 +267,39 @@ function buildAgents(){
   });
 }
 
+const DUP_OPTS = [
+  ["",      "All Appointments"],
+  ["any",   "Duplicates only"],
+  ["cross", "Cross-setter dupes"],
+];
+
+function buildDupFilter(){
+  const list = document.getElementById("dpList");
+  list.innerHTML = DUP_OPTS.map(([v,n])=>`
+    <div class="pop-item${v===S.dup?" on":""}" data-d="${v}">${n}</div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.dup = el.dataset.d; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.d===S.dup));
+      document.getElementById("dpLabel").textContent =
+        (DUP_OPTS.find(o=>o[0]===S.dup)||DUP_OPTS[0])[1];
+      closePops(); render();
+    };
+  });
+}
+
 function filtered(){
   const a = S.week, b = iso(addDays(parse(S.week),6));
-  return S.data.appts.filter(r =>
-    r[0] >= a && r[0] <= b && (!S.agent || r[1] === S.agent)
-  ).sort((x,y)=> y[0] < x[0] ? -1 : y[0] > x[0] ? 1 : 0);
+  return S.data.appts.filter(r =>{
+    if(r[0] < a || r[0] > b) return false;
+    if(S.agent && r[1] !== S.agent) return false;
+    if(S.dup){
+      const d = dupOf(r);
+      if(!d) return false;
+      if(S.dup === "cross" && d.agents.size < 2) return false;
+    }
+    return true;
+  }).sort((x,y)=> y[0] < x[0] ? -1 : y[0] > x[0] ? 1 : 0);
 }
 
 function render(){
@@ -280,24 +346,45 @@ function kpis(rows){
   </div>`;
 }
 
+// Counts the flagged rows in the current view, so the header says what the
+// pink is before you go looking for it.
+function dupNote(rows){
+  if(S.dup) return "";
+  let dup = 0, cross = 0;
+  rows.forEach(r=>{ const d = dupOf(r); if(!d) return; dup++; if(d.agents.size>1) cross++; });
+  if(!dup) return "";
+  return ` · <span style="color:#b90053">${dup} duplicate${dup===1?"":"s"}${
+    cross ? ` (${cross} cross-setter)` : ""}</span>`;
+}
+
 function tableCard(rows){
   const start = (S.page-1)*PAGE;
   const page = rows.slice(start, start+PAGE);
-  const body = page.map(r=>`
-    <tr>
+  const body = page.map(r=>{
+    const d = dupOf(r);
+    const cross = d && d.agents.size > 1;
+    const tag = d
+      ? `<span class="dup-tag${cross?" cross":""}" title="${cross
+          ? "Same phone booked twice this day by two different setters"
+          : "Same phone booked twice this day"}">${d.n}× ${cross?"cross":"dupe"}</span>`
+      : "";
+    return `
+    <tr class="${d?"dup":""}">
       <td class="mono">${fmt(r[0])}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td>${esc(r[3])} ${esc(r[4])}</td>
+      <td>${esc(r[3])} ${esc(r[4])}${tag}</td>
       <td class="mono">${esc(r[8]||"—")}</td>
       <td class="sub">${esc(r[9]||"—")}</td>
       <td class="sub">${esc(r[2])}</td>
       <td>${esc(r[5])}${r[6]?`, ${esc(r[6])}`:""}</td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
   const pages = Math.max(1, Math.ceil(rows.length/PAGE));
   return `<div class="card">
     <div class="eyebrow">Appointment Log</div>
     <h2 class="card-h">Every Appointment — Week of ${fmt(S.week)}</h2>
-    <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}</p>
+    <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
+      dupNote(rows)}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
@@ -322,7 +409,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();
