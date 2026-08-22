@@ -479,6 +479,52 @@ export default {
 
     const authed = await isAuthed(request, env);
 
+    /* ---- Make.com appointment ingest ---- */
+    // POST /api/appt  with header X-Ingest-Key: <INGEST_KEY>
+    // Body: {phone, setter, appointment_date?, account?, lead_id?, first_name?, last_name?}
+    // Writes one row to leads.appt_setter_map with source='make'.
+    if (path === "/api/appt" && request.method === "POST") {
+      if (!env.INGEST_KEY || request.headers.get("X-Ingest-Key") !== env.INGEST_KEY) {
+        return new Response(JSON.stringify({ error: "bad ingest key" }), {
+          status: 403, headers: JSON_HEADERS,
+        });
+      }
+      try {
+        let b = {};
+        try { b = await request.json(); } catch (_) {}
+        const phone = String(b.phone || "").trim();
+        const setter = String(b.setter || "").trim();
+        if (!phone) throw new Error("phone required");
+        if (!setter) throw new Error("setter required");
+
+        // appointment_date accepts YYYY-MM-DD or MM/DD/YYYY; anything else -> NULL
+        let ad = "NULL";
+        const raw = String(b.appointment_date || "").trim();
+        let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!m) {
+          const us = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if (us) m = [null, us[3], us[1].padStart(2, "0"), us[2].padStart(2, "0")];
+        }
+        if (m) ad = `DATE '${m[1]}-${m[2]}-${m[3]}'`;
+
+        await bq(env, `
+          INSERT INTO \`${PROJECT}.leads.appt_setter_map\`
+            (phone, setter, set_at, account, lead_first, lead_last, leadID, source, appointment_date)
+          VALUES (${sqlStr(phone, 40)}, ${sqlStr(setter, 80)}, CURRENT_TIMESTAMP(),
+                  ${sqlStr(b.account || "", 120)}, ${sqlStr(b.first_name || "", 60)},
+                  ${sqlStr(b.last_name || "", 60)}, ${sqlStr(b.lead_id || "", 40)},
+                  'make', ${ad})
+        `);
+        await bustDataCache(url);
+        return new Response(JSON.stringify({ ok: true, setter, phone }), { headers: JSON_HEADERS });
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ error: String(err && err.message ? err.message : err) }),
+          { status: 400, headers: JSON_HEADERS }
+        );
+      }
+    }
+
     /* ---- admin (spiffs + config) ---- */
     if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config") && request.method === "POST") {
       if (!authed) {
