@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Goals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ll-green:#00b580; --ll-magenta:#f40070; --ll-purple:#8a56f3;
+  --ll-cyan:#00c5ff;  --ll-yellow:#ffd900;  --ll-black:#191718;
+  --ll-surface:#f9fafb; --ll-border:#e5e7eb;
+  --muted:#6b7280; --dim:#a1a1aa;
+  --card-shadow:0 1px 3px rgba(25,23,24,.08), 0 16px 36px rgba(25,23,24,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Nunito",system-ui,sans-serif; color:var(--ll-black);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0,197,255,.06), transparent 28%),
+    linear-gradient(180deg,#fff 0%, #f9fafb 34%, #f6f7f8 100%);
+  min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{
+  border:1px solid rgba(229,231,235,.92); background:rgba(255,255,255,.94);
+  box-shadow:var(--card-shadow); border-radius:14px; padding:20px;
+  animation:fadeUp 260ms ease both;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:6px;color:#0094aa;
+  font-family:"Outfit",sans-serif;font-size:.72rem;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px;
+}
+.card-h{font-family:"Nunito";font-size:1.08rem;font-weight:850;line-height:1.05;margin:0 0 2px}
+.card-sub{font-size:.87rem;color:var(--muted);font-weight:700;margin:0}
+
+/* ---------------------------------------------------------- filter bar */
+.filter-bar{
+  border:1px solid rgba(229,231,235,.92); border-radius:18px;
+  background:rgba(255,255,255,.96); box-shadow:var(--card-shadow);
+  padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  position:relative; z-index:40; animation:fadeUp 260ms ease both;
+}
+.seg{display:inline-flex;border:1px solid var(--ll-border);border-radius:999px;background:#fff;overflow:hidden}
+.seg button{
+  border:0;background:transparent;font-family:"Nunito";font-weight:850;font-size:.9rem;
+  padding:9px 20px;cursor:pointer;color:var(--muted);transition:background 150ms ease,color 150ms ease;
+}
+.seg button.on{background:var(--ll-purple);color:#fff}
+.freshness{margin-left:auto;font-size:.78rem;font-weight:700;color:var(--muted)}
+.admin-btn{
+  display:inline-flex;align-items:center;gap:7px;min-height:38px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;
+  font-family:"Nunito";font-weight:850;font-size:.86rem;padding:0 14px;cursor:pointer;
+  color:var(--ll-black);
+}
+.admin-btn:hover{border-color:rgba(138,86,243,.62)}
+
+/* ------------------------------------------------------------ team hero */
+.hero{
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#191718 0%,#241f2e 58%,#2e1f3d 100%);
+  border:0;color:#fff;padding:26px 28px;
+}
+.hero::after{
+  content:"";position:absolute;right:-70px;top:-90px;width:290px;height:290px;
+  border-radius:999px;background:radial-gradient(circle,rgba(138,86,243,.5),transparent 68%);
+  pointer-events:none;
+}
+.hero .eyebrow{color:var(--ll-cyan)}
+.hero-top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.hero-num{font-family:"Outfit",sans-serif;font-size:clamp(2.6rem,6vw,4rem);font-weight:900;line-height:.95}
+.hero-num small{font-size:.34em;font-weight:800;color:rgba(255,255,255,.55);margin-left:6px}
+.hero-label{font-size:.9rem;font-weight:800;color:rgba(255,255,255,.62);margin-top:8px}
+.hero-right{text-align:right}
+.hero-pct{font-family:"Outfit",sans-serif;font-size:2.1rem;font-weight:900;line-height:1}
+.hero-note{font-size:.84rem;font-weight:750;color:rgba(255,255,255,.6);margin-top:4px}
+
+.bar{position:relative;height:16px;border-radius:999px;background:rgba(255,255,255,.13);overflow:hidden;margin-top:18px}
+.bar > i{
+  display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--ll-cyan),var(--ll-green));
+  width:0;transition:width 900ms cubic-bezier(.2,.7,.3,1);
+}
+.bar.hit > i{background:linear-gradient(90deg,var(--ll-green),var(--ll-yellow))}
+.pace-mark{
+  position:absolute;top:-5px;bottom:-5px;width:2px;background:rgba(255,255,255,.55);
+  border-radius:2px;
+}
+.hero-legend{display:flex;gap:16px;margin-top:12px;font-size:.79rem;font-weight:750;color:rgba(255,255,255,.55);flex-wrap:wrap}
+.hero-legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:999px;display:inline-block}
+
+/* -------------------------------------------------------- agent rows */
+.rows{display:flex;flex-direction:column;gap:2px;margin-top:16px}
+.row{
+  display:grid;grid-template-columns:198px 1fr 132px;gap:16px;align-items:center;
+  padding:13px 10px;border-radius:11px;transition:background 140ms ease;
+}
+.row:hover{background:#fafafa}
+.row .who{display:flex;align-items:center;gap:11px;min-width:0}
+.av{
+  width:34px;height:34px;border-radius:11px;flex:none;display:flex;align-items:center;
+  justify-content:center;font-family:"Outfit";font-weight:900;font-size:.84rem;color:#fff;
+}
+.who b{font-weight:850;font-size:.94rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.abar{position:relative;height:13px;border-radius:999px;background:#f1f2f4;overflow:hidden}
+.abar > i{display:block;height:100%;border-radius:999px;width:0;transition:width 900ms cubic-bezier(.2,.7,.3,1)}
+.rt{text-align:right;white-space:nowrap}
+.rt b{font-family:"Outfit",sans-serif;font-weight:900;font-size:1.16rem}
+.rt span{font-size:.8rem;font-weight:800;color:var(--dim);margin-left:3px}
+.rt .pc{display:block;font-size:.78rem;font-weight:800;color:var(--muted);margin-top:1px}
+.hitmark{color:var(--ll-green);font-weight:900}
+
+/* --------------------------------------------------------------- modal */
+.mask{
+  position:fixed;inset:0;background:rgba(25,23,24,.45);display:none;
+  align-items:center;justify-content:center;z-index:200;padding:20px;
+}
+.mask.open{display:flex}
+.modal{
+  background:#fff;border-radius:16px;padding:22px;width:min(430px,100%);
+  box-shadow:0 30px 70px rgba(25,23,24,.28);max-height:90vh;overflow:auto;
+}
+.modal h3{font-family:"Nunito";font-size:1.1rem;font-weight:900;margin:0 0 4px}
+.modal p.hint{font-size:.85rem;color:var(--muted);font-weight:700;margin:0 0 16px}
+.fld{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.fld label{font-size:.9rem;font-weight:800}
+.fld input{
+  width:104px;border:1px solid var(--ll-border);border-radius:9px;padding:8px 11px;
+  font-family:"Outfit";font-weight:800;font-size:.95rem;text-align:right;
+}
+.fld input:focus{outline:2px solid rgba(138,86,243,.35);outline-offset:1px}
+.sep{height:1px;background:#f1f2f4;margin:14px 0}
+.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:18px}
+.btn{
+  border:1px solid var(--ll-border);background:#fff;border-radius:9px;padding:9px 16px;
+  font-family:"Nunito";font-weight:850;font-size:.9rem;cursor:pointer;color:var(--ll-black);
+}
+.btn.pri{background:var(--ll-purple);border-color:var(--ll-purple);color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+.modal .err-txt{color:#b90053;font-size:.84rem;font-weight:800;margin-top:10px}
+
+.err{
+  border:1px solid rgba(244,0,112,.3);background:rgba(244,0,112,.05);color:#b90053;
+  border-radius:14px;padding:18px;font-weight:750;
+}
+.skel{
+  background:linear-gradient(90deg,#f1f2f4 25%,#e9eaec 50%,#f1f2f4 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px;
+}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media (max-width:620px){
+  .row{grid-template-columns:1fr 96px;grid-template-areas:"who rt" "bar bar";gap:9px}
+  .row .who{grid-area:who} .row .abar{grid-area:bar} .row .rt{grid-area:rt}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="filter-bar">
+    <div class="seg" id="seg">
+      <button data-p="week" class="on">This Week</button>
+      <button data-p="month">This Month</button>
+    </div>
+    <button class="admin-btn" id="adminBtn" title="Set targets">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.63.68 1.1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Targets
+    </button>
+    <div class="freshness" id="freshness">Loading…</div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3>Weekly &amp; monthly targets</h3>
+    <p class="hint">These drive every bar on this page. Agents can see the bars; only you can change the numbers.</p>
+    <div id="fields"></div>
+    <div class="modal-actions">
+      <button class="btn" id="mCancel">Cancel</button>
+      <button class="btn pri" id="mSave">Save targets</button>
+    </div>
+    <div class="err-txt" id="mErr" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+// Same brand rotation the rest of the dashboard uses, so an agent keeps his
+// colour from tab to tab.
+const COLORS = ["#8a56f3","#00b580","#00c5ff","#f40070","#e8a300","#ff8a3d"];
+const S = { data:null, err:null, period:"week", admin:null };
+
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const mondayOf = d => addDays(d, -((d.getDay()+6)%7));
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const initials = n => String(n||"?").trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
+const colorFor = u => COLORS[(Object.keys(S.data.agents).sort().indexOf(u) + 6) % COLORS.length];
+
+/* -------------------------------------------------------- period window */
+
+function windowOf(){
+  const now = new Date();
+  if(S.period === "month"){
+    const a = new Date(now.getFullYear(), now.getMonth(), 1);
+    const b = new Date(now.getFullYear(), now.getMonth()+1, 0);
+    return { a:iso(a), b:iso(b), label:`${MONTHS[now.getMonth()]} ${now.getFullYear()}`,
+             elapsed: now.getDate(), total: b.getDate() };
+  }
+  const a = mondayOf(now), b = addDays(a,6);
+  // Mon=1 … Sun=7. Saturday is a working day here, so the week is 6 long for
+  // pace purposes and Sunday just rides at 100% elapsed.
+  const dow = Math.min(6, (now.getDay()+6)%7 + 1);
+  return { a:iso(a), b:iso(b),
+           label:`Week of ${MONTHS[a.getMonth()].slice(0,3)} ${a.getDate()}`,
+           elapsed: dow, total: 6 };
+}
+
+function counts(){
+  const w = windowOf();
+  const per = {};
+  let team = 0;
+  for(const r of S.data.appts){
+    if(r[0] < w.a || r[0] > w.b) continue;
+    team++;
+    if(r[1]) per[r[1]] = (per[r[1]]||0) + 1;
+  }
+  return { w, per, team };
+}
+
+// Targets are stored per week. The month view scales them by 4.3 (the average
+// weeks in a month) so there's only one number per agent to maintain.
+const WEEKS_PER_MONTH = 4.3;
+function targetFor(u){
+  const c = S.data.config || {};
+  const wk = Number(c["goal_" + u] || 0);
+  if(!wk) return 0;
+  return S.period === "month" ? Math.round(wk * WEEKS_PER_MONTH) : wk;
+}
+function teamTarget(){
+  const c = S.data.config || {};
+  const t = Number(c[S.period === "month" ? "goal_team_month" : "goal_team_week"] || 0);
+  if(t) return t;
+  // No team target set — fall back to the sum of the individual ones so the
+  // hero bar is never a divide-by-zero.
+  return Object.keys(S.data.agents).reduce((s,u)=>s+targetFor(u),0);
+}
+
+/* ------------------------------------------------------------- rendering */
+
+async function load(){
+  try{
+    const r = await fetch("/api/data", { cache:"no-store" });
+    if(r.status===401){ parent.location.href="/login"; return; }
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    S.data = j;
+    const m = j.meta;
+    if(m && m.last_sync){
+      const t = new Date(m.last_sync);
+      document.getElementById("freshness").textContent =
+        "Data synced " + t.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+    }
+  }catch(e){ S.err = String(e.message||e); }
+  render();
+}
+
+function render(){
+  const c = document.getElementById("content");
+  if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load goals.</strong><br>${esc(S.err)}</div>`; return; }
+  if(!S.data){ c.innerHTML = `<div class="card skel" style="height:190px"></div>
+    <div class="card skel" style="height:300px;margin-top:14px"></div>`; return; }
+  const { w, per, team } = counts();
+  c.innerHTML = hero(w, team) + agentCard(w, per);
+  // Let the browser paint the zero-width bars, then animate them out.
+  requestAnimationFrame(()=>{
+    document.querySelectorAll("[data-fill]").forEach(el=>{ el.style.width = el.dataset.fill + "%"; });
+  });
+}
+
+function hero(w, team){
+  const goal = teamTarget();
+  const pct  = goal ? Math.min(100, Math.round(team/goal*100)) : 0;
+  const hit  = goal && team >= goal;
+  const left = Math.max(0, goal - team);
+  // Where the team *should* be by now if it were tracking evenly.
+  const pace = Math.min(100, Math.round(w.elapsed / w.total * 100));
+  const ahead = pct >= pace;
+
+  return `<div class="card hero">
+    <div class="eyebrow">Team Goal · ${esc(w.label)}</div>
+    <div class="hero-top">
+      <div>
+        <div class="hero-num">${team}<small>/ ${goal || "—"}</small></div>
+        <div class="hero-label">appointments booked</div>
+      </div>
+      <div class="hero-right">
+        <div class="hero-pct" style="color:${hit ? "var(--ll-yellow)" : ahead ? "var(--ll-green)" : "var(--ll-cyan)"}">${pct}%</div>
+        <div class="hero-note">${
+          hit ? "Goal smashed 🎉"
+              : left === 1 ? "1 to go"
+              : `${left} to go`}</div>
+      </div>
+    </div>
+    <div class="bar${hit?" hit":""}">
+      <i data-fill="${pct}"></i>
+      ${!hit && pace < 100 ? `<div class="pace-mark" style="left:${pace}%"></div>` : ""}
+    </div>
+    <div class="hero-legend">
+      <span><i class="dot" style="background:linear-gradient(90deg,var(--ll-cyan),var(--ll-green))"></i> Booked so far</span>
+      ${!hit && pace < 100 ? `<span><i class="dot" style="background:rgba(255,255,255,.55)"></i> On-pace marker (${pace}%)</span>` : ""}
+      <span>${ahead && !hit ? "Ahead of pace" : hit ? "Done early" : "Behind pace"}</span>
+    </div>
+  </div>`;
+}
+
+function agentCard(w, per){
+  const users = Object.keys(S.data.agents)
+    .filter(u => targetFor(u) > 0 || per[u])
+    .sort((a,b) => (per[b]||0) - (per[a]||0));
+
+  const rows = users.map(u=>{
+    const n = per[u] || 0;
+    const g = targetFor(u);
+    const pct = g ? Math.min(100, Math.round(n/g*100)) : 0;
+    const hit = g && n >= g;
+    const col = colorFor(u);
+    const fill = hit
+      ? "linear-gradient(90deg,var(--ll-green),var(--ll-yellow))"
+      : `linear-gradient(90deg,${col},${col})`;
+    return `<div class="row">
+      <div class="who">
+        <div class="av" style="background:${col}">${esc(initials(S.data.agents[u]))}</div>
+        <b>${esc(S.data.agents[u]||u)}</b>
+      </div>
+      <div class="abar"><i data-fill="${pct}" style="background:${fill}"></i></div>
+      <div class="rt">
+        <b>${n}</b><span>/ ${g || "—"}</span>
+        <span class="pc">${hit ? '<span class="hitmark">✓ Goal hit</span>' : g ? `${pct}%` : "no target set"}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<div class="card">
+    <div class="eyebrow">Individual Goals</div>
+    <h2 class="card-h">Where everyone stands</h2>
+    <p class="card-sub">${esc(w.label)} · targets are set per agent</p>
+    <div class="rows">${rows || `<p class="card-sub" style="padding:26px 0;text-align:center">No targets set yet — hit <strong>Targets</strong> above.</p>`}</div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- admin */
+
+function openAdmin(){
+  const pc = S.admin || sessionStorage.getItem("cc_admin_pc") || "";
+  if(!pc){
+    const v = prompt("Admin passcode");
+    if(!v) return;
+    S.admin = v; sessionStorage.setItem("cc_admin_pc", v);
+  } else S.admin = pc;
+
+  const c = S.data.config || {};
+  const users = Object.keys(S.data.agents).sort((a,b)=>
+    String(S.data.agents[a]).localeCompare(String(S.data.agents[b])));
+  document.getElementById("fields").innerHTML = `
+    <div class="fld"><label>Team — per week</label>
+      <input type="number" min="0" step="1" id="g_team_week" value="${Number(c.goal_team_week||0)}"></div>
+    <div class="fld"><label>Team — per month</label>
+      <input type="number" min="0" step="1" id="g_team_month" value="${Number(c.goal_team_month||0)}"></div>
+    <div class="sep"></div>
+    ${users.map(u=>`
+      <div class="fld"><label>${esc(S.data.agents[u]||u)}</label>
+        <input type="number" min="0" step="1" data-u="${esc(u)}" value="${Number(c["goal_"+u]||0)}"></div>`).join("")}
+    <p class="hint" style="margin:12px 0 0">Per-agent numbers are the weekly target. On the month view each one is multiplied by 4.3.</p>`;
+  document.getElementById("mErr").style.display = "none";
+  document.getElementById("mask").classList.add("open");
+}
+
+async function saveAdmin(){
+  const btn = document.getElementById("mSave");
+  const err = document.getElementById("mErr");
+  btn.disabled = true; btn.textContent = "Saving…";
+  try{
+    const values = {
+      goal_team_week:  Number(document.getElementById("g_team_week").value || 0),
+      goal_team_month: Number(document.getElementById("g_team_month").value || 0),
+    };
+    document.querySelectorAll("#fields input[data-u]").forEach(i=>{
+      values["goal_" + i.dataset.u] = Number(i.value || 0);
+    });
+    const r = await fetch("/api/config", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ admin: S.admin, values }),
+    });
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    Object.assign(S.data.config, values);
+    document.getElementById("mask").classList.remove("open");
+    render();
+  }catch(e){
+    // A bad passcode shouldn't strand a stale one in session storage.
+    if(String(e.message||e).includes("passcode")){ S.admin = null; sessionStorage.removeItem("cc_admin_pc"); }
+    err.textContent = String(e.message||e); err.style.display = "block";
+  }finally{
+    btn.disabled = false; btn.textContent = "Save targets";
+  }
+}
+
+/* ----------------------------------------------------------------- wire */
+
+document.getElementById("seg").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-p]"); if(!b) return;
+  S.period = b.dataset.p;
+  document.querySelectorAll("#seg button").forEach(x=>x.classList.toggle("on", x===b));
+  render();
+});
+document.getElementById("adminBtn").onclick = openAdmin;
+document.getElementById("mCancel").onclick = ()=>document.getElementById("mask").classList.remove("open");
+document.getElementById("mSave").onclick = saveAdmin;
+document.getElementById("mask").addEventListener("click", e=>{
+  if(e.target.id === "mask") document.getElementById("mask").classList.remove("open");
+});
+document.addEventListener("keydown", e=>{
+  if(e.key === "Escape") document.getElementById("mask").classList.remove("open");
+});
+
+load();
+</script>
+</body>
+</html>

@@ -433,10 +433,13 @@ async function handleAdmin(request, env, url) {
 
   if (url.pathname === "/api/config") {
     const ALLOWED = ["set_bonus", "sit_bonus", "sit_rate", "close_rate", "avg_project", "rev_share", "hourly_rate"];
+    // Goals widget targets: goal_team_week, goal_team_month, and one per agent
+    // (goal_2002 …). Agent keys are open-ended so a new hire needs no deploy.
+    const GOAL_RE = /^goal_(team_week|team_month|20[0-9]{2})$/;
     const values = body.values || {};
     const pairs = [];
-    for (const k of ALLOWED) {
-      if (values[k] === undefined) continue;
+    for (const k of Object.keys(values)) {
+      if (!ALLOWED.includes(k) && !GOAL_RE.test(k)) continue;
       const v = Number(values[k]);
       if (!Number.isFinite(v) || v < 0) throw new Error(`bad value for ${k}`);
       pairs.push([k, v]);
