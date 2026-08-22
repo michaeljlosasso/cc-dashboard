@@ -62,37 +62,53 @@ body{
 .admin-btn:hover{border-color:rgba(138,86,243,.62)}
 
 /* ------------------------------------------------------------ team hero */
-.hero{
-  position:relative;overflow:hidden;
-  background:linear-gradient(135deg,#191718 0%,#241f2e 58%,#2e1f3d 100%);
-  border:0;color:#fff;padding:26px 28px;
-}
+/* Same light metric-tile language as the other widgets: white card, tinted
+   badge, and the soft currentColor disc bleeding off the bottom-right. */
+.hero{position:relative;overflow:hidden;padding:22px 24px;color:var(--ll-cyan)}
+/* Same disc the metric tiles use — small, tucked in the corner. Children sit
+   above it (z-index below), so it never washes over the bar. */
 .hero::after{
-  content:"";position:absolute;right:-70px;top:-90px;width:290px;height:290px;
-  border-radius:999px;background:radial-gradient(circle,rgba(138,86,243,.5),transparent 68%);
-  pointer-events:none;
+  content:"";position:absolute;right:-22px;bottom:-38px;width:112px;height:112px;
+  border-radius:999px;opacity:.09;background:currentColor;pointer-events:none;
 }
-.hero .eyebrow{color:var(--ll-cyan)}
-.hero-top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
-.hero-num{font-family:"Outfit",sans-serif;font-size:clamp(2.6rem,6vw,4rem);font-weight:900;line-height:.95}
-.hero-num small{font-size:.34em;font-weight:800;color:rgba(255,255,255,.55);margin-left:6px}
-.hero-label{font-size:.9rem;font-weight:800;color:rgba(255,255,255,.62);margin-top:8px}
+.hero.hit{color:var(--ll-green)}
+.hero > *{position:relative;z-index:1}
+.hero-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.badge{
+  width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:color-mix(in srgb,currentColor 12%,white);
+}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;border-radius:999px;
+  padding:5px 11px;font-size:.76rem;font-weight:850;
+  color:currentColor;background:color-mix(in srgb,currentColor 11%,white);
+}
+.hero-top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-top:14px}
+.hero-num{
+  font-family:"Outfit",sans-serif;font-size:clamp(2.3rem,5vw,3.3rem);
+  font-weight:900;line-height:.95;color:var(--ll-black);
+}
+.hero-num small{font-size:.36em;font-weight:800;color:var(--dim);margin-left:6px}
+.hero-label{
+  font-family:"Nunito";font-size:.82rem;font-weight:850;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);margin-top:7px;
+}
 .hero-right{text-align:right}
-.hero-pct{font-family:"Outfit",sans-serif;font-size:2.1rem;font-weight:900;line-height:1}
-.hero-note{font-size:.84rem;font-weight:750;color:rgba(255,255,255,.6);margin-top:4px}
+.hero-pct{font-family:"Outfit",sans-serif;font-size:2rem;font-weight:900;line-height:1}
+.hero-note{font-size:.85rem;font-weight:750;color:var(--muted);margin-top:3px}
 
-.bar{position:relative;height:16px;border-radius:999px;background:rgba(255,255,255,.13);overflow:hidden;margin-top:18px}
+.bar{position:relative;height:15px;border-radius:999px;background:#eef0f2;overflow:hidden;margin-top:18px}
 .bar > i{
   display:block;height:100%;border-radius:999px;
   background:linear-gradient(90deg,var(--ll-cyan),var(--ll-green));
   width:0;transition:width 900ms cubic-bezier(.2,.7,.3,1);
 }
-.bar.hit > i{background:linear-gradient(90deg,var(--ll-green),var(--ll-yellow))}
+.bar.hit > i{background:linear-gradient(90deg,var(--ll-green),#ffc400)}
 .pace-mark{
-  position:absolute;top:-5px;bottom:-5px;width:2px;background:rgba(255,255,255,.55);
+  position:absolute;top:-4px;bottom:-4px;width:2px;background:rgba(25,23,24,.3);
   border-radius:2px;
 }
-.hero-legend{display:flex;gap:16px;margin-top:12px;font-size:.79rem;font-weight:750;color:rgba(255,255,255,.55);flex-wrap:wrap}
+.hero-legend{display:flex;gap:15px;margin-top:11px;font-size:.79rem;font-weight:750;color:var(--muted);flex-wrap:wrap}
 .hero-legend span{display:inline-flex;align-items:center;gap:6px}
 .dot{width:8px;height:8px;border-radius:999px;display:inline-block}
 
@@ -299,17 +315,25 @@ function hero(w, team){
   const pace = Math.min(100, Math.round(w.elapsed / w.total * 100));
   const ahead = pct >= pace;
 
-  return `<div class="card hero">
-    <div class="eyebrow">Team Goal · ${esc(w.label)}</div>
-    <div class="hero-top">
+  const ic = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>`;
+
+  return `<div class="card hero${hit?" hit":""}">
+    <div class="hero-head">
+      <div class="badge">${ic}</div>
+      <span class="chip">${hit ? "🎉 Goal hit" : ahead ? "↗ Ahead of pace" : "Behind pace"}</span>
+    </div>
+    <div class="eyebrow" style="margin:14px 0 0">Team Goal · ${esc(w.label)}</div>
+    <div class="hero-top" style="margin-top:6px">
       <div>
         <div class="hero-num">${team}<small>/ ${goal || "—"}</small></div>
         <div class="hero-label">appointments booked</div>
       </div>
       <div class="hero-right">
-        <div class="hero-pct" style="color:${hit ? "var(--ll-yellow)" : ahead ? "var(--ll-green)" : "var(--ll-cyan)"}">${pct}%</div>
+        <div class="hero-pct">${pct}%</div>
         <div class="hero-note">${
-          hit ? "Goal smashed 🎉"
+          hit ? "Goal smashed"
               : left === 1 ? "1 to go"
               : `${left} to go`}</div>
       </div>
@@ -320,8 +344,7 @@ function hero(w, team){
     </div>
     <div class="hero-legend">
       <span><i class="dot" style="background:linear-gradient(90deg,var(--ll-cyan),var(--ll-green))"></i> Booked so far</span>
-      ${!hit && pace < 100 ? `<span><i class="dot" style="background:rgba(255,255,255,.55)"></i> On-pace marker (${pace}%)</span>` : ""}
-      <span>${ahead && !hit ? "Ahead of pace" : hit ? "Done early" : "Behind pace"}</span>
+      ${!hit && pace < 100 ? `<span><i class="dot" style="background:rgba(25,23,24,.3)"></i> On-pace marker (${pace}%)</span>` : ""}
     </div>
   </div>`;
 }
