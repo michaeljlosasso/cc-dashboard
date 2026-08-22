@@ -23,7 +23,9 @@
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
-- [ ] Leaderboard sub-widget (agent-facing rankings)
+- [x] Goals sub-widget (team + per-agent progress bars) — shipped Aug 22, replaces the
+      "Leaderboard" idea. Ranked boards rejected: Jonathan took #1 in 10 of 12 weeks.
+      Targets live in cc_config (`goal_team_week`, `goal_team_month`, `goal_<user>`).
 - [ ] Spiffs / contests sub-widget
 - [ ] Confirm commission-month interpretation with partner: dashboard pays **prior full month** on the first Friday ≥ 5th (doc's literal text said "current month")
 - [ ] Optional: move shell to cc.llmedia.info (nicer URL for agents; makes widgets same-site if Access is ever wanted)
