@@ -510,23 +510,35 @@ export default {
         if (!phone) throw new Error("phone required");
         if (!setter) throw new Error("setter required");
 
-        // appointment_date accepts YYYY-MM-DD or MM/DD/YYYY; anything else -> NULL
-        let ad = "NULL";
-        const raw = String(b.appointment_date || "").trim();
+        // Make sends GHL's calendar.startTime, e.g. "2026-08-24T14:00:00" —
+        // wall-clock local time in the calendar's own timezone, no offset. It's
+        // stored as DATETIME (not TIMESTAMP) so no timezone maths can shift the
+        // hour. appointment_date is kept alongside it for the date-only reads.
+        // Also accepts YYYY-MM-DD and MM/DD/YYYY; anything else -> NULL.
+        let ad = "NULL", at = "NULL";
+        const raw = String(b.appointment_date || b.appointment_at || "").trim();
         let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (!m) {
           const us = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
           if (us) m = [null, us[3], us[1].padStart(2, "0"), us[2].padStart(2, "0")];
         }
-        if (m) ad = `DATE '${m[1]}-${m[2]}-${m[3]}'`;
+        if (m) {
+          const ymd = `${m[1]}-${m[2]}-${m[3]}`;
+          ad = `DATE '${ymd}'`;
+          // Time part is optional — a date-only value still gets a DATETIME at 00:00.
+          const t = raw.match(/[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+          const hms = t ? `${t[1]}:${t[2]}:${t[3] || "00"}` : "00:00:00";
+          at = `DATETIME '${ymd} ${hms}'`;
+        }
 
         await bq(env, `
           INSERT INTO \`${PROJECT}.leads.appt_setter_map\`
-            (phone, setter, set_at, account, lead_first, lead_last, leadID, source, appointment_date)
+            (phone, setter, set_at, account, lead_first, lead_last, leadID, source,
+             appointment_date, appointment_at)
           VALUES (${sqlStr(phone, 40)}, ${sqlStr(setter, 80)}, CURRENT_TIMESTAMP(),
                   ${sqlStr(b.account || "", 120)}, ${sqlStr(b.first_name || "", 60)},
                   ${sqlStr(b.last_name || "", 60)}, ${sqlStr(b.lead_id || "", 40)},
-                  'make', ${ad})
+                  'make', ${ad}, ${at})
         `);
         await bustDataCache(url);
         return new Response(JSON.stringify({ ok: true, setter, phone }), { headers: JSON_HEADERS });
