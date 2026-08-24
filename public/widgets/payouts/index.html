@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Payouts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ll-green:#00b580; --ll-magenta:#f40070; --ll-purple:#8a56f3;
+  --ll-cyan:#00c5ff;  --ll-yellow:#ffd900;  --ll-black:#191718;
+  --ll-border:#e5e7eb; --muted:#6b7280; --dim:#a1a1aa;
+  --card-shadow:0 1px 3px rgba(25,23,24,.08), 0 16px 36px rgba(25,23,24,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Nunito",system-ui,sans-serif; color:var(--ll-black);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(244,0,112,.05), transparent 28%),
+    linear-gradient(180deg,#fff 0%, #f9fafb 34%, #f6f7f8 100%);
+  min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{
+  border:1px solid rgba(229,231,235,.92); background:rgba(255,255,255,.94);
+  box-shadow:var(--card-shadow); border-radius:14px; padding:20px;
+  animation:fadeUp 260ms ease both;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:6px;color:#b90053;
+  font-family:"Outfit",sans-serif;font-size:.72rem;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px;
+}
+.card-h{font-family:"Nunito";font-size:1.08rem;font-weight:850;line-height:1.05;margin:0 0 2px}
+.card-sub{font-size:.87rem;color:var(--muted);font-weight:700;margin:0}
+
+.filter-bar{
+  border:1px solid rgba(229,231,235,.92); border-radius:18px;
+  background:rgba(255,255,255,.96); box-shadow:var(--card-shadow);
+  padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  position:relative; z-index:40; animation:fadeUp 260ms ease both;
+}
+.owner-tag{
+  display:inline-flex;align-items:center;gap:7px;border-radius:999px;
+  padding:6px 13px;font-size:.78rem;font-weight:900;letter-spacing:.02em;
+  color:#b90053;background:rgba(244,0,112,.10);
+}
+.filter-control{
+  display:inline-flex;align-items:center;gap:9px;min-height:40px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;
+  color:var(--ll-black);font-family:"Nunito",sans-serif;font-size:.93rem;
+  font-weight:850;padding:0 16px;box-shadow:0 1px 2px rgba(25,23,24,.04);cursor:pointer;
+}
+.filter-control:hover{border-color:rgba(138,86,243,.62)}
+.pop-wrap{position:relative}
+.pop{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:60;display:none;
+  width:min(300px,calc(100vw - 48px));border:1px solid rgba(229,231,235,.94);
+  border-radius:13px;background:#fff;box-shadow:0 22px 54px rgba(25,23,24,.14);overflow:hidden;
+}
+.pop.open{display:block}
+.pop-list{max-height:340px;overflow:auto;padding:8px}
+.pop-item{
+  display:flex;align-items:center;padding:9px 12px;border-radius:9px;cursor:pointer;
+  font-size:.9rem;font-weight:750;color:#3f3f46;
+}
+.pop-item:hover{background:#f4f4f5}
+.pop-item.on{background:rgba(244,0,112,.10);color:#b90053;font-weight:850}
+.spacer{margin-left:auto;font-size:.78rem;font-weight:700;color:var(--muted)}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.metric-card{position:relative;overflow:hidden}
+.metric-card::after{
+  content:"";position:absolute;right:-22px;bottom:-38px;width:112px;height:112px;
+  border-radius:999px;opacity:.09;background:currentColor;pointer-events:none;
+}
+.metric-card > *{position:relative;z-index:1}
+.badge{
+  width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:color-mix(in srgb,currentColor 12%,white);
+}
+.mc-label{
+  font-family:"Nunito";font-size:.82rem;font-weight:850;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--muted);margin-top:14px;
+}
+.mc-value{
+  font-family:"Outfit",sans-serif;font-size:clamp(1.65rem,2.4vw,2.3rem);
+  font-weight:900;line-height:1;margin-top:2px;color:var(--ll-black);
+}
+.mc-help{font-size:.87rem;font-weight:700;color:var(--muted);margin-top:6px}
+.c-magenta{color:var(--ll-magenta)} .c-cyan{color:var(--ll-cyan)}
+.c-purple{color:var(--ll-purple)} .c-green{color:var(--ll-green)}
+
+.tbl-scroll{overflow-x:auto;margin:0 -20px;padding:0 20px}
+table{border-collapse:collapse;width:100%;font-size:.88rem;font-weight:700;min-width:900px}
+thead th{
+  text-align:right;font-size:.68rem;font-weight:900;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--dim);padding:0 10px 10px;white-space:nowrap;
+}
+thead th:first-child{text-align:left}
+tbody td{padding:12px 10px;border-top:1px solid #f1f2f4;white-space:nowrap;text-align:right}
+tbody td:first-child{text-align:left;font-weight:850}
+tbody tr:hover{background:#fafafa}
+tfoot td{
+  padding:13px 10px;border-top:2px solid #eceef0;font-weight:900;text-align:right;
+  font-family:"Outfit",sans-serif;
+}
+tfoot td:first-child{text-align:left;font-family:"Nunito"}
+.mono{font-variant-numeric:tabular-nums}
+.pay{font-family:"Outfit",sans-serif;font-weight:900;font-size:1rem}
+.dim{color:var(--dim);font-weight:750}
+.note{
+  margin-top:14px;border-left:3px solid var(--ll-yellow);background:rgba(255,217,0,.08);
+  border-radius:0 9px 9px 0;padding:11px 14px;font-size:.85rem;font-weight:750;color:#6b5800;
+}
+.err{
+  border:1px solid rgba(244,0,112,.3);background:rgba(244,0,112,.05);color:#b90053;
+  border-radius:14px;padding:18px;font-weight:750;
+}
+.gate{text-align:center;padding:52px 20px}
+.gate h2{font-family:"Nunito";font-weight:900;font-size:1.2rem;margin:0 0 6px}
+.gate p{color:var(--muted);font-weight:700;margin:0 0 18px;font-size:.9rem}
+.btn{
+  border:1px solid var(--ll-magenta);background:var(--ll-magenta);color:#fff;
+  border-radius:10px;padding:11px 22px;font-family:"Nunito";font-weight:850;
+  font-size:.93rem;cursor:pointer;
+}
+.skel{
+  background:linear-gradient(90deg,#f1f2f4 25%,#e9eaec 50%,#f1f2f4 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px;
+}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="filter-bar">
+    <span class="owner-tag">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      Owner only
+    </span>
+    <div class="pop-wrap">
+      <button class="filter-control" id="wkBtn" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span id="wkLabel">—</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="wkPop"><div class="pop-list" id="wkList"></div></div>
+    </div>
+    <div class="spacer" id="freshness"></div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+"use strict";
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const S = { data:null, err:null, week:null, weeks:[], admin:null, loading:false };
+
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const mondayOf = d => addDays(d, -((d.getDay()+6)%7));
+const fmt = s => { const d=parse(s); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const usd = n => "$" + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+
+function buildWeeks(){
+  const out = [];
+  let m = mondayOf(new Date());
+  for(let i=0;i<16;i++){ out.push(iso(m)); m = addDays(m,-7); }
+  S.weeks = out;
+  if(!S.week) S.week = out[0];
+  const list = document.getElementById("wkList");
+  list.innerHTML = S.weeks.map(w=>`
+    <div class="pop-item${w===S.week?" on":""}" data-w="${w}">
+      Week of ${fmt(w)} – ${fmt(iso(addDays(parse(w),6)))}
+    </div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.week = el.dataset.w;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.w===S.week));
+      setWeekLabel(); closePops(); load();
+    };
+  });
+  setWeekLabel();
+}
+function setWeekLabel(){
+  document.getElementById("wkLabel").textContent =
+    `Week of ${fmt(S.week)} – ${fmt(iso(addDays(parse(S.week),6)))}`;
+}
+
+/* The passcode is only ever sent to the server; no figure on this page is
+   computed in the browser. A wrong code returns 403 and renders nothing. */
+async function load(){
+  S.admin = S.admin || sessionStorage.getItem("cc_admin_pc") || "";
+  if(!S.admin){ S.data = null; render(); return; }
+  S.loading = true; S.err = null; render();
+  try{
+    const r = await fetch("/api/admin/payroll", {
+      method:"POST", headers:{ "Content-Type":"application/json" }, cache:"no-store",
+      body: JSON.stringify({ admin:S.admin, week:S.week }),
+    });
+    if(r.status===401){ parent.location.href="/login"; return; }
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    S.data = j;
+    document.getElementById("freshness").textContent =
+      `Rates: $${j.rates.appt}/appt · $${j.rates.same_next} same-next · $${j.rates.hourly}/hr`;
+  }catch(e){
+    S.err = String(e.message||e);
+    if(S.err.toLowerCase().includes("passcode")){ S.admin=null; sessionStorage.removeItem("cc_admin_pc"); }
+  }finally{ S.loading = false; }
+  render();
+}
+
+function unlock(){
+  const v = prompt("Owner passcode");
+  if(!v) return;
+  S.admin = v; sessionStorage.setItem("cc_admin_pc", v);
+  load();
+}
+
+function render(){
+  const c = document.getElementById("content");
+  if(!S.admin){
+    c.innerHTML = `<div class="card gate">
+      <h2>Owner passcode required</h2>
+      <p>This page shows what every agent is paid. It's never sent to an agent's browser.</p>
+      <button class="btn" id="unlockBtn">Unlock</button>
+    </div>`;
+    document.getElementById("unlockBtn").onclick = unlock;
+    return;
+  }
+  if(S.err){
+    c.innerHTML = `<div class="err"><strong>Couldn't load payouts.</strong><br>${esc(S.err)}</div>`;
+    return;
+  }
+  if(S.loading || !S.data){
+    c.innerHTML = `<div class="kpi-row">${'<div class="card skel" style="height:150px"></div>'.repeat(4)}</div>
+      <div class="card skel" style="height:320px;margin-top:14px"></div>`;
+    return;
+  }
+  c.innerHTML = kpis() + table();
+}
+
+function totals(){
+  const a = S.data.agents;
+  return {
+    appts:   a.reduce((s,x)=>s+x.appts,0),
+    same_next: a.reduce((s,x)=>s+x.same_next,0),
+    spiffs:  a.reduce((s,x)=>s+x.spiffs,0),
+    payout:  a.reduce((s,x)=>s+x.payout,0),
+    hours:   a.reduce((s,x)=>s+x.hours,0),
+    hourly:  a.reduce((s,x)=>s+x.hourly_pay,0),
+    cost:    a.reduce((s,x)=>s+x.total_cost,0),
+  };
+}
+
+function kpis(){
+  const t = totals();
+  const cpa = t.appts ? t.cost / t.appts : 0;
+  const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const tile = (cls,icon,label,value,help) => `
+    <div class="card metric-card ${cls}">
+      <div class="badge">${icon}</div>
+      <div class="mc-label">${label}</div>
+      <div class="mc-value">${value}</div>
+      <div class="mc-help">${help}</div>
+    </div>`;
+  return `<div class="kpi-row">
+    ${tile("c-magenta", ic('<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+      "Friday Payout", usd(t.payout), "appointments + same/next + spiffs")}
+    ${tile("c-purple", ic('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+      "Hourly Cost", usd(t.hourly), `${t.hours.toFixed(1)} hours logged`)}
+    ${tile("c-cyan", ic('<path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/>'),
+      "Total Labor", usd(t.cost), "payout + hourly, all agents")}
+    ${tile("c-green", ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
+      "Cost / Appt", usd(cpa), `${t.appts} appointments booked`)}
+  </div>`;
+}
+
+function table(){
+  const t = totals();
+  const cov = S.data.coverage || { dated:0, appts:0 };
+  const rows = S.data.agents.map(a=>`
+    <tr>
+      <td>${esc(a.name)}</td>
+      <td class="mono">${a.appts}</td>
+      <td class="mono">${usd(a.appt_pay)}</td>
+      <td class="mono">${a.same_next || '<span class="dim">—</span>'}</td>
+      <td class="mono">${a.sn_pay ? usd(a.sn_pay) : '<span class="dim">—</span>'}</td>
+      <td class="mono">${a.spiffs ? usd(a.spiffs) : '<span class="dim">—</span>'}</td>
+      <td class="mono pay">${usd(a.payout)}</td>
+      <td class="mono">${a.hours.toFixed(1)}</td>
+      <td class="mono">${usd(a.hourly_pay)}</td>
+      <td class="mono pay">${usd(a.total_cost)}</td>
+      <td class="mono">${a.cost_per_appt == null ? '<span class="dim">—</span>' : usd(a.cost_per_appt)}</td>
+    </tr>`).join("");
+
+  return `<div class="card">
+    <div class="eyebrow">Owner View</div>
+    <h2 class="card-h">What everyone makes — week of ${fmt(S.data.week)}</h2>
+    <p class="card-sub">Friday payout is the appointment side. Hourly is the Monday payout.</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr>
+        <th>Agent</th>
+        <th>Appts</th><th>Appt $</th>
+        <th>Same/Next</th><th>S/N $</th>
+        <th>Spiffs</th>
+        <th>Friday</th>
+        <th>Hours</th><th>Hourly $</th>
+        <th>Total Cost</th><th>$ / Appt</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="11" class="dim" style="padding:30px;text-align:center">No activity this week.</td></tr>`}</tbody>
+      <tfoot><tr>
+        <td>Total</td>
+        <td class="mono">${t.appts}</td><td class="mono">${usd(t.appts * S.data.rates.appt)}</td>
+        <td class="mono">${t.same_next || "—"}</td><td class="mono">${usd(t.same_next * S.data.rates.same_next)}</td>
+        <td class="mono">${usd(t.spiffs)}</td>
+        <td class="mono">${usd(t.payout)}</td>
+        <td class="mono">${t.hours.toFixed(1)}</td><td class="mono">${usd(t.hourly)}</td>
+        <td class="mono">${usd(t.cost)}</td>
+        <td class="mono">${t.appts ? usd(t.cost/t.appts) : "—"}</td>
+      </tr></tfoot>
+    </table>
+    </div>
+    ${cov.dated < cov.appts ? `<div class="note">
+      <strong>Same/next-day is incomplete for this week.</strong> Only ${cov.dated} of ${cov.appts}
+      appointments carry a scheduled date — Make started sending it Aug 22, 2026, so earlier weeks
+      report zero rather than a wrong number. Demos aren't computed yet (formula still unknown).
+    </div>` : ""}
+  </div>`;
+}
+
+function closePops(){
+  document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
+  document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
+}
+document.getElementById("wkBtn").onclick = (e)=>{
+  e.stopPropagation();
+  const pop = document.getElementById("wkPop");
+  const wasOpen = pop.classList.contains("open");
+  closePops();
+  if(!wasOpen){ pop.classList.add("open"); e.currentTarget.setAttribute("aria-expanded","true"); }
+};
+document.addEventListener("click", closePops);
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closePops(); });
+
+buildWeeks();
+load();
+</script>
+</body>
+</html>

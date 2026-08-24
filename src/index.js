@@ -346,6 +346,20 @@ const SQL_CONFIG = `
 SELECT key, value FROM \`${PROJECT}.leads.cc_config\`
 `;
 
+// Same/next-day bonus counts. Only rows carrying appointment_at can be judged —
+// that field started flowing from Make on Aug 22 2026, so earlier weeks report
+// zero rather than a wrong number. set_at is when the appointment was booked.
+const SQL_SAME_NEXT = `
+SELECT ${SETTER_ALIAS_SQL} AS setter_key,
+       FORMAT_DATE('%Y-%m-%d', DATE(set_at)) AS booked_date,
+       COUNTIF(DATE(appointment_at) = DATE(set_at)) AS same_day,
+       COUNTIF(DATE(appointment_at) = DATE_ADD(DATE(set_at), INTERVAL 1 DAY)) AS next_day,
+       COUNT(*) AS dated
+FROM \`${PROJECT}.leads.appt_setter_map\`
+WHERE appointment_at IS NOT NULL AND setter IS NOT NULL
+GROUP BY 1, 2
+`;
+
 function sqlStr(s, max) {
   return "'" + String(s).slice(0, max || 200).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
 }
@@ -405,6 +419,95 @@ async function handleAdmin(request, env, url) {
     return new Response(JSON.stringify({ error: "bad admin passcode" }), {
       status: 403, headers: JSON_HEADERS,
     });
+  }
+
+  /* ---- owner-only payout view ----
+   * Every dollar figure an agent must never see is computed HERE and returned
+   * only after isAdmin() passes. Nothing in the agent-facing bundle contains
+   * pay rates, hourly cost, or per-agent totals — so "view source" gets them
+   * nothing. Do not move any of this into a widget's JavaScript.
+   */
+  if (url.pathname === "/api/admin/payroll") {
+    const week = String(body.week || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) throw new Error("bad week (want YYYY-MM-DD Monday)");
+    const end = new Date(`${week}T00:00:00Z`);
+    end.setUTCDate(end.getUTCDate() + 6);
+    const weekEnd = end.toISOString().slice(0, 10);
+
+    const [payload, sameNext] = await Promise.all([
+      buildPayload(env),
+      bq(env, SQL_SAME_NEXT).catch(() => ({ rows: [] })),
+    ]);
+
+    const cfg = payload.config || {};
+    const rate = {
+      appt: Number(cfg.set_bonus ?? 5),
+      same_next: Number(cfg.sit_bonus ?? 5),
+      demo: Number(cfg.demo_bonus ?? 5),
+      hourly: Number(cfg.hourly_rate ?? 0),
+    };
+
+    // name -> user, so setter-map rows (keyed by name) can join the agent list.
+    const byName = {};
+    for (const [user, name] of Object.entries(payload.agents)) {
+      byName[String(name).trim().toLowerCase()] = user;
+    }
+
+    const row = (u) => ({
+      user: u, name: payload.agents[u] || u,
+      appts: 0, same_day: 0, next_day: 0, dated: 0,
+      demos: null, spiffs: 0, hours: 0,
+    });
+    const agg = {};
+    const get = (u) => (agg[u] || (agg[u] = row(u)));
+
+    for (const [d, u] of payload.appts) {
+      if (!u || d < week || d > weekEnd) continue;
+      get(u).appts++;
+    }
+    for (const [key, d, same, next, dated] of sameNext.rows) {
+      if (d < week || d > weekEnd) continue;
+      const u = byName[key];
+      if (!u) continue;
+      const r = get(u);
+      r.same_day += Number(same); r.next_day += Number(next); r.dated += Number(dated);
+    }
+    for (const [, u, amount, , d] of payload.spiffs) {
+      if (!u || d < week || d > weekEnd) continue;
+      get(u).spiffs += Number(amount);
+    }
+    for (const [u, d, hrs] of payload.hours) {
+      if (d < week || d > weekEnd) continue;
+      get(u).hours += Number(hrs);
+    }
+
+    const agents = Object.values(agg).map((r) => {
+      const sn = r.same_day + r.next_day;
+      const appt_pay = r.appts * rate.appt;
+      const sn_pay = sn * rate.same_next;
+      const hourly_pay = Math.round(r.hours * rate.hourly * 100) / 100;
+      const payout = appt_pay + sn_pay + r.spiffs;
+      return {
+        ...r,
+        hours: Math.round(r.hours * 100) / 100,
+        same_next: sn,
+        appt_pay, sn_pay, hourly_pay,
+        payout,                                  // Friday: appointment side only
+        total_cost: Math.round((payout + hourly_pay) * 100) / 100,
+        cost_per_appt: r.appts
+          ? Math.round(((payout + hourly_pay) / r.appts) * 100) / 100
+          : null,
+      };
+    }).sort((a, b) => b.payout - a.payout);
+
+    return new Response(JSON.stringify({
+      week, week_end: weekEnd, rates: rate, agents,
+      // Straight talk for the UI: how much of the week can actually be judged.
+      coverage: {
+        dated: agents.reduce((s, a) => s + a.dated, 0),
+        appts: agents.reduce((s, a) => s + a.appts, 0),
+      },
+    }), { headers: { ...JSON_HEADERS, "Cache-Control": "no-store" } });
   }
 
   if (url.pathname === "/api/spiff") {
@@ -551,7 +654,8 @@ export default {
     }
 
     /* ---- admin (spiffs + config) ---- */
-    if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config") && request.method === "POST") {
+    if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config"
+         || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
       }

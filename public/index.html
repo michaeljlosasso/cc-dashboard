@@ -119,6 +119,7 @@ body{font-family:"Nunito",system-ui,sans-serif;display:flex;height:100vh;overflo
        onmouseover="this.style.color='#8a56f3'" onmouseout="this.style.color='#a1a1aa'">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </a>
+    <button id="ownerBtn" title="Owner view">Owner</button>
     <button id="logout" title="Sign out">Sign out</button>
   </div>
 </aside>
@@ -197,6 +198,20 @@ const nav = document.getElementById("nav");
 const holder = document.getElementById("frameHolder");
 let activeBtn = null;
 
+// Owner-only nav. The section is hidden until the owner passcode is entered,
+// and the page behind it fetches its figures from a passcode-checked endpoint —
+// hiding the link is convenience, not the security boundary.
+const OWNER_SECTION = {
+  label: "Owner", color: "#b90053", defaultOpen: true, owner: true,
+  items: [
+    { icon: "dollar", label: "Payouts", path: "/widgets/payouts/",
+      sub: "What everyone makes — not visible to agents",
+      chat: "https://claude.ai/cowork/cse_01G9RPR1XJfihMy8gmFT5Jc6" },
+  ],
+};
+const isOwner = () => !!sessionStorage.getItem("cc_admin_pc");
+if (isOwner()) NAV_SECTIONS.push(OWNER_SECTION);
+
 function openState(label, fallback){
   const v = localStorage.getItem("cc-sec-" + label);
   return v === null ? fallback : v === "1";
@@ -261,8 +276,26 @@ document.getElementById("burger").onclick = () =>
 
 document.getElementById("logout").onclick = () => {
   document.cookie = "cc_session=; Path=/; Max-Age=0";
+  sessionStorage.removeItem("cc_admin_pc");
   location.reload();
 };
+
+// Owner toggle: reveals the Payouts section for this browser tab only. The
+// passcode is not verified here — the Payouts page checks it server-side and
+// shows nothing if it's wrong. Clears on sign-out or when the tab closes.
+const ownerBtn = document.getElementById("ownerBtn");
+function paintOwnerBtn(){
+  ownerBtn.textContent = isOwner() ? "Owner ✓" : "Owner";
+  ownerBtn.style.color = isOwner() ? "#b90053" : "";
+}
+ownerBtn.onclick = () => {
+  if (isOwner()) { sessionStorage.removeItem("cc_admin_pc"); location.reload(); return; }
+  const v = prompt("Owner passcode");
+  if (!v) return;
+  sessionStorage.setItem("cc_admin_pc", v);
+  location.reload();
+};
+paintOwnerBtn();
 </script>
 </body>
 </html>
