@@ -176,7 +176,7 @@ const JUNK_LEAD_SQL = `
 const SQL_APPTS = `
 WITH sold AS (
   SELECT leadID,
-         REGEXP_REPLACE(phone_home, r'\\D', '') AS ph,
+         RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph,
          createdOn, sold, phone_home, email_address,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
@@ -184,11 +184,11 @@ WITH sold AS (
     AND createdOnDate >= '2026-01-01'${JUNK_LEAD_SQL}
 ),
 agent_calls AS (
-  SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
+  SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10) AS ph, user, status, call_date
   FROM \`${PROJECT}.vicidial.vicidial_log\`
   WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
   UNION ALL
-  SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
+  SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10) AS ph, user, status, call_date
   FROM \`${PROJECT}.vicidial.vicidial_closer_log\`
   WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
 )
@@ -217,7 +217,7 @@ ORDER BY booked_date
 const SQL_APPTS_V2 = `
 WITH sold AS (
   SELECT leadID,
-         REGEXP_REPLACE(phone_home, r'\\D', '') AS ph,
+         RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph,
          createdOn, sold, phone_home, email_address,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
@@ -226,7 +226,7 @@ WITH sold AS (
 ),
 map AS (
   SELECT leadID AS map_lead_id,
-         REGEXP_REPLACE(phone, r'\\D', '') AS ph,
+         RIGHT(REGEXP_REPLACE(IFNULL(phone,''), r'\\D', ''), 10) AS ph,
          set_at,
          ${SETTER_ALIAS_SQL} AS setter_key
   FROM \`${PROJECT}.leads.appt_setter_map\`
@@ -239,11 +239,11 @@ users AS (
   GROUP BY fn
 ),
 agent_calls AS (
-  SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
+  SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10) AS ph, user, status, call_date
   FROM \`${PROJECT}.vicidial.vicidial_log\`
   WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
   UNION ALL
-  SELECT REGEXP_REPLACE(phone_number, r'\\D', '') AS ph, user, status, call_date
+  SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10) AS ph, user, status, call_date
   FROM \`${PROJECT}.vicidial.vicidial_closer_log\`
   WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
 ),
