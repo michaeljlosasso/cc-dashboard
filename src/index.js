@@ -227,7 +227,7 @@ WITH sold AS (
 map AS (
   SELECT leadID AS map_lead_id,
          RIGHT(REGEXP_REPLACE(IFNULL(phone,''), r'\\D', ''), 10) AS ph,
-         set_at,
+         set_at, appointment_at,
          ${SETTER_ALIAS_SQL} AS setter_key
   FROM \`${PROJECT}.leads.appt_setter_map\`
   WHERE setter IS NOT NULL
@@ -262,6 +262,12 @@ picked AS (
     ARRAY_AGG(mp.setter_key IGNORE NULLS
       ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), SECOND))
       LIMIT 1)[SAFE_OFFSET(0)] AS set_by_phone,
+    -- Appointment time comes from whichever map row matched this lead, ordered
+    -- the same way, so a repeat caller can't inherit a later booking's date.
+    ARRAY_AGG(mi.appointment_at IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] AS appt_at_id,
+    ARRAY_AGG(mp.appointment_at IGNORE NULLS
+      ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), SECOND))
+      LIMIT 1)[SAFE_OFFSET(0)] AS appt_at_phone,
     ARRAY_AGG(c.user IGNORE NULLS
       ORDER BY IF(c.status='APPTBK',0,1),
                ABS(TIMESTAMP_DIFF(c.call_date, TIMESTAMP(s.createdOn), SECOND))
@@ -276,7 +282,8 @@ picked AS (
 SELECT
   FORMAT_DATETIME('%Y-%m-%d', p.createdOn) AS booked_date,
   COALESCE(u.user, p.call_user) AS agent_user,
-  p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold, p.phone, p.email
+  p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold, p.phone, p.email,
+  FORMAT_DATETIME('%Y-%m-%d %H:%M', COALESCE(p.appt_at_id, p.appt_at_phone)) AS appt_at
 FROM picked p
 LEFT JOIN users u ON u.fn = COALESCE(p.set_by_id, p.set_by_phone)
 ORDER BY booked_date
