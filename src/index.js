@@ -353,6 +353,16 @@ const SQL_CONFIG = `
 SELECT key, value FROM \`${PROJECT}.leads.cc_config\`
 `;
 
+// Spiff windows: which weeks a programmatic spiff (e.g. same/next-day) is
+// switched on. Spiffs change week to week, so nothing pays unless a window
+// covers it. Managed from the Spiffs sub-widget.
+const SQL_SPIFF_WINDOWS = `
+SELECT id, kind, FORMAT_DATE('%Y-%m-%d', start_date) AS s,
+       FORMAT_DATE('%Y-%m-%d', end_date) AS e, rate, IFNULL(note,'') AS note
+FROM \`${PROJECT}.leads.cc_spiff_windows\`
+ORDER BY start_date DESC
+`;
+
 // Same/next-day bonus counts. Only rows carrying appointment_at can be judged —
 // that field started flowing from Make on Aug 22 2026, so earlier weeks report
 // zero rather than a wrong number. set_at is when the appointment was booked.
@@ -375,7 +385,7 @@ async function buildPayload(env) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -383,6 +393,7 @@ async function buildPayload(env) {
     bq(env, SQL_SPIFFS).catch(() => ({ rows: [] })),
     bq(env, SQL_CONFIG).catch(() => ({ rows: [] })),
     bq(env, SQL_BREAKS).catch(() => ({ rows: [] })),
+    bq(env, SQL_SPIFF_WINDOWS).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -404,6 +415,8 @@ async function buildPayload(env) {
     spiffs: spiffs.rows.map((r) => [r[0], r[1], Number(r[2]), r[3], r[4]]),
     // [user, date, code, hours]
     breaks: breaks.rows.map((r) => [r[0], r[1], r[2], Number(r[3])]),
+    // [id, kind, start_date, end_date, rate, note]
+    spiff_windows: windows.rows.map((r) => [r[0], r[1], r[2], r[3], Number(r[4]), r[5]]),
     // {set_bonus, sit_bonus, sit_rate, close_rate, avg_project, rev_share, hourly_rate}
     config: configMap,
   };
@@ -532,6 +545,33 @@ async function handleAdmin(request, env, url) {
     `);
     await bustDataCache(url);
     return new Response(JSON.stringify({ ok: true, id }), { headers: JSON_HEADERS });
+  }
+
+  if (url.pathname === "/api/spiff-window") {
+    const kind = String(body.kind || "");
+    const start = String(body.start_date || ""), end = String(body.end_date || "");
+    const rate = Number(body.rate);
+    if (!/^[a-z_]{1,32}$/.test(kind)) throw new Error("bad kind");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error("bad dates");
+    if (end < start) throw new Error("end before start");
+    if (!Number.isFinite(rate) || rate < 0 || rate > 1000) throw new Error("bad rate");
+    const id = crypto.randomUUID();
+    await bq(env, `
+      INSERT INTO \`${PROJECT}.leads.cc_spiff_windows\`
+        (id, kind, start_date, end_date, rate, note, created_at)
+      VALUES ('${id}', '${kind}', DATE '${start}', DATE '${end}', ${rate},
+              ${sqlStr(body.note || "", 200)}, CURRENT_TIMESTAMP())
+    `);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true, id }), { headers: JSON_HEADERS });
+  }
+
+  if (url.pathname === "/api/spiff-window/delete") {
+    const id = String(body.id || "");
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("bad id");
+    await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_spiff_windows\` WHERE id = '${id}'`);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
   }
 
   if (url.pathname === "/api/spiff/delete") {
@@ -663,6 +703,7 @@ export default {
 
     /* ---- admin (spiffs + config) ---- */
     if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config"
+         || path === "/api/spiff-window" || path === "/api/spiff-window/delete"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });

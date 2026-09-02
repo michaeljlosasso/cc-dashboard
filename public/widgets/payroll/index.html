@@ -414,8 +414,12 @@ function compute(){
   const sits = countInRange(rows, bk.sits[0], bk.sits[1]);
   const comm = ci ? countInRange(rows, ci.start, ci.end) : null;
 
-  // same/next-day spiffs are earned in the same week the sets were booked
-  const spiffQty = spiffCounts(rows, bk.sets[0], bk.sets[1]);
+  // Same/next-day only pays when a spiff window covers the sets week.
+  // Spiffs change week to week; no window = no spiff, count shows 0.
+  const win = (S.data.spiff_windows||[]).find(w =>
+    w[1] === "same_next" && w[2] <= bk.sets[1] && w[3] >= bk.sets[0]);
+  const spiffRate = win ? win[4] : 0;
+  const spiffQty = win ? spiffCounts(rows, bk.sets[0], bk.sets[1]) : {};
 
   // manual spiffs (+ Spiff button) awarded in that window pay out too
   const spiffPer = {};
@@ -444,7 +448,7 @@ function compute(){
     }
     const nSpiff = spiffQty[u]||0;
     const manualSpiff = spiffPer[u]||0;
-    const spiffPay = nSpiff * CFG.spiff_bonus + manualSpiff;
+    const spiffPay = nSpiff * spiffRate + manualSpiff;
     const total = setPay + sitPay + commPay + spiffPay;
     if(nSets===0 && sitBase===0 && commAppts===0 && spiffPay===0) continue;
     perAgent.push({
@@ -464,7 +468,7 @@ function compute(){
   const monthLabel = ci ? ci.label : `${MONTHS[f.getMonth()]} ${f.getFullYear()}`;
   const monthAppts = Object.values(month.per).reduce((a,n)=>a+n,0);
 
-  return { bk, ci, perAgent, unSets:sets.un, unSits:sits.un, unComm:comm?comm.un:0,
+  return { bk, ci, perAgent, spiffWin:win, unSets:sets.un, unSits:sits.un, unComm:comm?comm.un:0,
            monthAppts, monthLabel };
 }
 
@@ -565,7 +569,7 @@ function tableCard(R){
   return `<div class="card">
     <div class="eyebrow">Friday Commission Run</div>
     <h2 class="card-h">Per-Agent Payout — Friday ${fmtLong(S.friday)}</h2>
-    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}${R.ci?` · Commission: ${R.ci.label}`:""}</p>
+    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}${R.ci?` · Commission: ${R.ci.label}`:""} · Spiff: ${R.spiffWin ? `same/next-day $${R.spiffWin[4]}` : "none this week"}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr>

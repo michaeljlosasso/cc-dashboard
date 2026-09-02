@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spiffs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ll-green:#00b580; --ll-magenta:#f40070; --ll-purple:#8a56f3;
+  --ll-cyan:#00c5ff;  --ll-yellow:#ffd900;  --ll-black:#191718;
+  --ll-surface:#f9fafb; --ll-border:#e5e7eb;
+  --muted:#6b7280; --dim:#a1a1aa;
+  --card-shadow:0 1px 3px rgba(25,23,24,.08), 0 16px 36px rgba(25,23,24,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Nunito",system-ui,sans-serif; color:var(--ll-black);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0,197,255,.06), transparent 28%),
+    linear-gradient(180deg,#fff 0%, #f9fafb 34%, #f6f7f8 100%);
+  min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{
+  border:1px solid rgba(229,231,235,.92); background:rgba(255,255,255,.94);
+  box-shadow:var(--card-shadow); border-radius:14px; padding:20px;
+  animation:fadeUp 260ms ease both;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:6px;color:#0094aa;
+  font-family:"Outfit",sans-serif;font-size:.72rem;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px;
+}
+.card-h{font-family:"Nunito";font-size:1.08rem;font-weight:850;line-height:1.05;margin:0 0 2px}
+.card-sub{font-size:.87rem;color:var(--muted);font-weight:700;margin:0}
+.filter-bar{
+  border:1px solid rgba(229,231,235,.92); border-radius:18px;
+  background:rgba(255,255,255,.96); box-shadow:var(--card-shadow);
+  padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  animation:fadeUp 260ms ease both;
+}
+.freshness{margin-left:auto;font-size:.78rem;font-weight:700;color:var(--muted)}
+.admin-btn{
+  display:inline-flex;align-items:center;gap:7px;min-height:38px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;
+  font-family:"Nunito";font-weight:850;font-size:.86rem;padding:0 14px;cursor:pointer;
+  color:var(--ll-black);
+}
+.admin-btn:hover{border-color:rgba(138,86,243,.62)}
+.admin-btn.on{background:var(--ll-purple);border-color:var(--ll-purple);color:#fff}
+
+/* this-week status */
+.status{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.metric-card{position:relative;overflow:hidden}
+.metric-card::after{
+  content:"";position:absolute;right:-22px;bottom:-38px;width:112px;height:112px;
+  border-radius:999px;opacity:.09;background:currentColor;pointer-events:none;
+}
+.badge{
+  width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;background:color-mix(in srgb,currentColor 12%,white);
+}
+.mc-label{font-family:"Nunito";font-size:.82rem;font-weight:850;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);margin-top:14px}
+.mc-value{font-family:"Outfit",sans-serif;font-size:clamp(1.5rem,2.4vw,2.1rem);font-weight:900;line-height:1;margin-top:2px}
+.mc-help{font-family:"Nunito";font-size:.87rem;font-weight:700;color:var(--muted);margin-top:6px}
+.c-green{color:var(--ll-green)} .c-dim{color:#9ca3af} .c-purple{color:var(--ll-purple)}
+
+/* windows list */
+.tbl-scroll{overflow:auto;margin:0 -20px;padding:0 20px}
+table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
+thead th{text-align:left;font-size:.7rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:0 12px 10px;white-space:nowrap}
+thead th.r,td.r{text-align:right}
+tbody td{padding:11px 12px;border-top:1px solid #f1f2f4;white-space:nowrap;vertical-align:top}
+tbody tr:hover{background:#fafafa}
+.pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:.72rem;font-weight:850}
+.p-live{color:#007e5c;background:rgba(0,181,128,.10)}
+.p-past{color:#6b7280;background:#f1f2f4}
+.p-future{color:#5b34c4;background:rgba(138,86,243,.12)}
+.kind{font-weight:850}
+.sub{color:var(--muted);font-weight:700;font-size:.78rem}
+.del{background:none;border:none;color:#b90053;cursor:pointer;font-weight:900;padding:2px 6px;font-family:"Nunito"}
+.del:disabled{opacity:.3;cursor:default}
+
+/* add form */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:14px}
+.form label{display:block;font-size:.78rem;font-weight:850;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+.form input,.form select{
+  width:100%;border:1px solid var(--ll-border);border-radius:9px;padding:9px 11px;
+  font-family:"Nunito";font-weight:800;font-size:.92rem;background:#fff;
+}
+.form input:focus,.form select:focus{outline:2px solid rgba(138,86,243,.35);outline-offset:1px}
+.form-actions{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.btn{
+  border:1px solid var(--ll-border);background:#fff;border-radius:9px;padding:9px 16px;
+  font-family:"Nunito";font-weight:850;font-size:.9rem;cursor:pointer;color:var(--ll-black);
+}
+.btn.pri{background:var(--ll-purple);border-color:var(--ll-purple);color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+.msg{font-size:.84rem;font-weight:800;color:var(--muted)}
+.msg.bad{color:#b90053} .msg.ok{color:#007e5c}
+.locked{color:var(--muted);font-weight:700;font-size:.9rem;padding:22px 0;text-align:center}
+.err{border:1px solid rgba(244,0,112,.3);background:rgba(244,0,112,.05);color:#b90053;border-radius:14px;padding:18px;font-weight:750}
+.skel{background:linear-gradient(90deg,#f1f2f4 25%,#e9eaec 50%,#f1f2f4 75%);background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="filter-bar">
+    <span class="card-sub">Programmatic spiffs turn on per week. No window, no spiff.</span>
+    <div class="freshness" id="freshness">Loading…</div>
+    <button class="admin-btn" id="adminBtn">Admin</button>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+"use strict";
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const KINDS = { same_next: "Same / next-day appointment" };
+const S = { data:null, err:null };
+const A = { pc: sessionStorage.getItem("cc_admin_pc") || "" };
+
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const mondayOf = d => addDays(d, -((d.getDay()+6)%7));
+const fmt = s => { const d=parse(s); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = n => "$" + Number(n).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+
+async function load(){
+  try{
+    const r = await fetch("/api/data", { cache:"no-store" });
+    if(r.status===401){ parent.location.href="/login"; return; }
+    const j = await r.json();
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    S.data = j;
+    const m = j.meta;
+    if(m && m.last_sync){
+      const t = new Date(m.last_sync);
+      document.getElementById("freshness").textContent =
+        "Data synced " + t.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+    }
+  }catch(e){ S.err = String(e.message||e); }
+  render();
+}
+
+async function reload(){
+  const r = await fetch("/api/data?refresh=1", { cache:"no-store" });
+  const j = await r.json();
+  if(r.ok && !j.error){ S.data = j; render(); }
+}
+
+/* ---------------------------------------------------------------- render */
+function render(){
+  const c = document.getElementById("content");
+  document.getElementById("adminBtn").classList.toggle("on", !!A.pc);
+  document.getElementById("adminBtn").textContent = A.pc ? "Admin ✓" : "Admin";
+  if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load spiffs.</strong><br>${esc(S.err)}</div>`; return; }
+  if(!S.data){ c.innerHTML = `<div class="card skel" style="height:150px"></div><div class="card skel" style="height:260px;margin-top:14px"></div>`; return; }
+  c.innerHTML = statusCards() + windowsCard();
+  wire();
+}
+
+function weekOf(d){ const m = mondayOf(d); return [iso(m), iso(addDays(m,6))]; }
+function activeFor(range){
+  return (S.data.spiff_windows||[]).find(w => w[2] <= range[1] && w[3] >= range[0]);
+}
+
+function statusCards(){
+  const today = new Date();
+  const thisWk = weekOf(today), nextWk = weekOf(addDays(today,7));
+  const a = activeFor(thisWk), b = activeFor(nextWk);
+  const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const bolt = ic('<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>');
+  const tile = (cls,label,value,help) => `
+    <div class="card metric-card ${cls}">
+      <div class="badge">${bolt}</div>
+      <div class="mc-label">${label}</div>
+      <div class="mc-value">${value}</div>
+      <div class="mc-help">${help}</div>
+    </div>`;
+  const desc = w => w ? `${KINDS[w[1]]||w[1]} · ${money(w[4])} each` : "no spiff running";
+  return `<div class="status">
+    ${tile(a?"c-green":"c-dim", `This week · ${fmt(thisWk[0])} – ${fmt(thisWk[1])}`, a?"ON":"OFF", desc(a))}
+    ${tile(b?"c-purple":"c-dim", `Next week · ${fmt(nextWk[0])} – ${fmt(nextWk[1])}`, b?"ON":"OFF", desc(b))}
+  </div>`;
+}
+
+function windowsCard(){
+  const today = iso(new Date());
+  const rows = (S.data.spiff_windows||[]).map(w=>{
+    const [id,kind,s,e,rate,note] = w;
+    const state = e < today ? ["p-past","Ended"] : s > today ? ["p-future","Scheduled"] : ["p-live","Live"];
+    return `<tr>
+      <td><span class="pill ${state[0]}">${state[1]}</span></td>
+      <td class="kind">${esc(KINDS[kind]||kind)}</td>
+      <td class="mono">${fmt(s)} – ${fmt(e)}</td>
+      <td class="r mono">${money(rate)}</td>
+      <td class="sub">${esc(note)}</td>
+      <td class="r"><button class="del" data-id="${esc(id)}" ${A.pc?"":"disabled"} title="Remove">✕</button></td>
+    </tr>`;
+  }).join("");
+
+  // default the form to next week — that's the one you're usually deciding about
+  const nxt = weekOf(addDays(new Date(),7));
+  const form = A.pc ? `
+    <div class="form">
+      <div><label>Spiff</label>
+        <select id="f_kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <div><label>Week starts (Mon)</label><input type="date" id="f_start" value="${nxt[0]}"></div>
+      <div><label>Week ends (Sun)</label><input type="date" id="f_end" value="${nxt[1]}"></div>
+      <div><label>$ each</label><input type="number" id="f_rate" step="0.5" min="0" value="5"></div>
+      <div style="grid-column:1/-1"><label>Note (optional)</label><input type="text" id="f_note" placeholder="e.g. Labor Day push"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn pri" id="f_save">Turn on for these dates</button>
+      <span class="msg" id="f_msg"></span>
+    </div>` : `<div class="locked">Hit <strong>Admin</strong> to add or remove spiff weeks.</div>`;
+
+  return `<div class="card">
+    <div class="eyebrow">Spiff Weeks</div>
+    <h2 class="card-h">When a spiff is switched on</h2>
+    <p class="card-sub">Commission only pays the spiff for weeks listed here. Everything else is $0.</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Status</th><th>Spiff</th><th>Week</th><th class="r">Rate</th><th>Note</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="sub" style="padding:26px;text-align:center">No spiff weeks yet.</td></tr>`}</tbody>
+    </table>
+    </div>
+    ${form}
+  </div>`;
+}
+
+/* ----------------------------------------------------------------- admin */
+async function adminPost(path, payload, msgEl){
+  const el = document.getElementById(msgEl);
+  if(el){ el.className = "msg"; el.textContent = "Saving…"; }
+  const r = await fetch(path, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ admin: A.pc, ...payload }),
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.error){
+    if(String(j.error||"").includes("passcode")){ A.pc=""; sessionStorage.removeItem("cc_admin_pc"); }
+    if(el){ el.textContent = j.error || `HTTP ${r.status}`; el.className = "msg bad"; }
+    return false;
+  }
+  if(el){ el.textContent = "Saved."; el.className = "msg ok"; }
+  return true;
+}
+
+function wire(){
+  const save = document.getElementById("f_save");
+  if(save) save.onclick = async ()=>{
+    const v = id => document.getElementById(id).value;
+    save.disabled = true;
+    const ok = await adminPost("/api/spiff-window", {
+      kind: v("f_kind"), start_date: v("f_start"), end_date: v("f_end"),
+      rate: Number(v("f_rate")), note: v("f_note"),
+    }, "f_msg");
+    save.disabled = false;
+    if(ok) await reload();
+  };
+  document.querySelectorAll(".del").forEach(b => b.onclick = async ()=>{
+    if(!A.pc) return;
+    b.disabled = true;
+    const ok = await adminPost("/api/spiff-window/delete", { id: b.dataset.id }, null);
+    if(ok) await reload(); else b.disabled = false;
+  });
+}
+
+document.getElementById("adminBtn").onclick = ()=>{
+  if(A.pc){ A.pc=""; sessionStorage.removeItem("cc_admin_pc"); render(); return; }
+  const pc = prompt("Admin passcode");
+  if(!pc) return;
+  A.pc = pc; sessionStorage.setItem("cc_admin_pc", pc); render();
+};
+
+load();
+</script>
+</body>
+</html>
