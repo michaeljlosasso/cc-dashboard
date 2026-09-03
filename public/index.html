@@ -81,7 +81,15 @@ body{font-family:"Nunito",system-ui,sans-serif;display:flex;height:100vh;overflo
 }
 .burger:hover{border-color:#c7cdd4}
 .page-title{font-family:"Outfit";font-weight:800;font-size:1.05rem;color:var(--brand-black)}
-.page-sub{font-size:.8rem;font-weight:700;color:#9ca3af}
+.page-sub{font-size:.8rem;font-weight:700;color:#9ca3af;display:flex;align-items:center;gap:6px}
+.info-link{
+  display:none;align-items:center;justify-content:center;width:16px;height:16px;
+  border-radius:999px;border:1.5px solid #c4c7cc;color:#9ca3af;text-decoration:none;
+  font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:.72rem;font-weight:700;
+  line-height:1;transition:color 140ms ease,border-color 140ms ease,background 140ms ease;
+}
+.info-link.show{display:inline-flex}
+.info-link:hover{color:#fff;background:var(--brand-purple);border-color:var(--brand-purple)}
 .edit-link{
   margin-left:auto;display:flex;align-items:center;gap:5px;font-size:.78rem;
   font-weight:800;color:#9ca3af;text-decoration:none;
@@ -131,7 +139,7 @@ body{font-family:"Nunito",system-ui,sans-serif;display:flex;height:100vh;overflo
     </button>
     <div>
       <div class="page-title" id="pageTitle">Payroll</div>
-      <div class="page-sub" id="pageSub"></div>
+      <div class="page-sub"><span id="pageSub"></span><a class="info-link" id="infoLink" target="_blank" rel="noopener noreferrer" title="How this works">i</a></div>
     </div>
     <a class="edit-link" id="editLink" target="_blank" rel="noopener noreferrer" title="Edit this widget">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -189,6 +197,7 @@ const NAV_SECTIONS = [
         chat: "https://github.com/michaeljlosasso/llmedia-zip-lookup-widget" },
       { icon: "shield", label: "Crazy Callers", path: "https://inbound-abuse.llmedia.info",
         sub: "How to identify mentally unwell callers and deactivate the DID",
+        help: "https://www.loom.com/",   // TODO: swap for the real Loom walkthrough
         chat: "https://claude.ai/cowork/cse_01WUWxnJ1kjbopA7NAx9FqEZ" },
     ],
   },
@@ -253,6 +262,9 @@ function select(item, btn, secColor){
   btn.style.color = col;
   document.getElementById("pageTitle").textContent = item.label;
   document.getElementById("pageSub").textContent = item.sub || "";
+  const info = document.getElementById("infoLink");
+  info.href = item.help || "#";
+  info.classList.toggle("show", !!item.help);
   document.getElementById("editLink").href = item.chat || SOURCE_CHAT_URL;
   if (item.soon || !item.path){
     holder.innerHTML = `<div class="placeholder"><div class="ph-card"><h2>Coming Soon</h2><p>${item.label} isn't built yet.</p></div></div>`;
