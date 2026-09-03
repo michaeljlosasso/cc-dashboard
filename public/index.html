@@ -157,6 +157,7 @@ const ICONS = {
   pin:    ic('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>'),
   calendar: ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
   zap:    ic('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+  shield: ic('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>'),
 };
 
 const NAV_SECTIONS = [
@@ -186,6 +187,9 @@ const NAV_SECTIONS = [
       { icon: "pin", label: "Zips", path: "https://llmedia-zip-lookup-widget.michael-5fa.workers.dev/?code=cSzUcUm83SsyPctjSAQwLP",
         sub: "Zip code lookup",
         chat: "https://github.com/michaeljlosasso/llmedia-zip-lookup-widget" },
+      { icon: "shield", label: "Inbound Abuse", path: "https://inbound-abuse.llmedia.info",
+        sub: "Inbound calls by DID today — spot a DID under attack and block it",
+        chat: "https://claude.ai/cowork/cse_01WUWxnJ1kjbopA7NAx9FqEZ" },
     ],
   },
 ];
