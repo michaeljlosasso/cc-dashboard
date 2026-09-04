@@ -166,6 +166,7 @@ const ICONS = {
   calendar: ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
   zap:    ic('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
   shield: ic('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>'),
+  search: ic('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
 };
 
 const NAV_SECTIONS = [
@@ -199,6 +200,9 @@ const NAV_SECTIONS = [
         sub: "How to identify mentally unwell callers and deactivate the DID",
         help: "https://www.loom.com/share/3376884de5914b4193399e8961e2926a",
         chat: "https://claude.ai/cowork/cse_01WUWxnJ1kjbopA7NAx9FqEZ" },
+      { icon: "search", label: "Call Finder", path: "https://call-finder.llmedia.info",
+        sub: "Search, play, download and export VICIdial call recordings",
+        chat: SOURCE_CHAT_URL },
     ],
   },
 ];
@@ -270,7 +274,9 @@ function select(item, btn, secColor){
     holder.innerHTML = `<div class="placeholder"><div class="ph-card"><h2>Coming Soon</h2><p>${item.label} isn't built yet.</p></div></div>`;
     return;
   }
-  holder.innerHTML = `<iframe src="${item.path}" title="${item.label}"></iframe>`;
+  // clipboard-write lets widgets with a "copy link" button use the native
+  // clipboard API (Call Finder asked for it); harmless for the others.
+  holder.innerHTML = `<iframe src="${item.path}" title="${item.label}" allow="clipboard-write"></iframe>`;
   // Slug from the label, not the path — external widget URLs made ugly hashes.
   try { history.replaceState(null, "", "#" + item.label.toLowerCase().replace(/\W+/g, "-")); } catch(_){}
 }
