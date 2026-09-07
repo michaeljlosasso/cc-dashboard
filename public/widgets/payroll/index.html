@@ -305,10 +305,15 @@ function commissionFriday(year, month){ // month 0-based
 
 // Is this Friday a commission Friday? If so it pays the PREVIOUS full
 // calendar month (the month that just closed).
+// Commission retired after August 2026 (Manny, Sep 7 2026): August pays on
+// Fri Sep 11 as owed; from September's month onward it never appears.
+const LAST_COMMISSION_MONTH = "2026-08";
+
 function commissionInfo(fridayIso){
   const f = parse(fridayIso);
   if(iso(f) !== commissionFriday(f.getFullYear(), f.getMonth())) return null;
   const prev = new Date(f.getFullYear(), f.getMonth()-1, 1);
+  if(iso(prev).slice(0,7) > LAST_COMMISSION_MONTH) return null;
   const start = iso(prev);
   const end = iso(new Date(prev.getFullYear(), prev.getMonth()+1, 0));
   return { start, end, label: `${MONTHS[prev.getMonth()]} ${prev.getFullYear()}` };

@@ -27,7 +27,7 @@
       "Leaderboard" idea. Ranked boards rejected: Jonathan took #1 in 10 of 12 weeks.
       Targets live in cc_config (`goal_team_week`, `goal_team_month`, `goal_<user>`).
 - [ ] Spiffs / contests sub-widget
-- [ ] Confirm commission-month interpretation with partner: dashboard pays **prior full month** on the first Friday ≥ 5th (doc's literal text said "current month")
+- [x] Monthly commission retired after August 2026 (`LAST_COMMISSION_MONTH` in payroll widget). Pays Fri Sep 11 as owed, never again after. Safe to strip the code entirely after Sep 11.
 - [ ] Optional: move shell to cc.llmedia.info (nicer URL for agents; makes widgets same-site if Access is ever wanted)
 
 ## Sub-widgets
