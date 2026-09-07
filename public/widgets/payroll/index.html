@@ -241,6 +241,11 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900}
     </div>
     <div class="row2">
       <div><label>Sit rate (%)</label><input id="cfg_sit_rate" type="number" step="1" /></div>
+      <div><label>Close rate (%)</label><input id="cfg_close_rate" type="number" step="0.1" /></div>
+    </div>
+    <div class="row2">
+      <div><label>Avg project ($)</label><input id="cfg_avg_project" type="number" step="1" /></div>
+      <div><label>Rev share (%)</label><input id="cfg_rev_share" type="number" step="0.01" /></div>
     </div>
     <div class="btns">
       <button class="ghost" data-close>Cancel</button>
@@ -261,6 +266,9 @@ const CFG = {
   sit_bonus: 5.0,
   sit_rate: 0.60,
   spiff_bonus: 5.0,   // $ per same/next-day appointment
+  close_rate: 0.04,
+  avg_project: 15274,
+  rev_share: 0.001,
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -286,6 +294,25 @@ function buckets(fridayIso){
   return { sets:[iso(setsStart),iso(setsEnd)], sits:[iso(sitsStart),iso(sitsEnd)] };
 }
 
+// First Friday on or after the 5th of the month (doc Part 4)
+function commissionFriday(year, month){ // month 0-based
+  for(let d=5; d<=11; d++){
+    const dt = new Date(year, month, d);
+    if(dt.getDay()===5) return iso(dt);
+  }
+  return null;
+}
+
+// Is this Friday a commission Friday? If so it pays the PREVIOUS full
+// calendar month (the month that just closed).
+function commissionInfo(fridayIso){
+  const f = parse(fridayIso);
+  if(iso(f) !== commissionFriday(f.getFullYear(), f.getMonth())) return null;
+  const prev = new Date(f.getFullYear(), f.getMonth()-1, 1);
+  const start = iso(prev);
+  const end = iso(new Date(prev.getFullYear(), prev.getMonth()+1, 0));
+  return { start, end, label: `${MONTHS[prev.getMonth()]} ${prev.getFullYear()}` };
+}
 
 /* ------------------------------------------------------------------ fetch */
 async function load(){
@@ -318,8 +345,9 @@ function buildFridays(){
 
   const list = document.getElementById("friList");
   list.innerHTML = S.fridays.map(f=>{
+    const ci = commissionInfo(f);
     return `<div class="pop-item${f===S.friday?" on":""}" data-f="${f}">
-      Friday, ${fmtLong(f)}
+      Friday, ${fmtLong(f)} ${ci?`<span class="tag">+ COMMISSION</span>`:""}
     </div>`;
   }).join("");
   list.querySelectorAll(".pop-item").forEach(el=>{
@@ -380,9 +408,11 @@ function countInRange(rows, a, b){
 function compute(){
   const rows = S.data.appts;
   const bk = buckets(S.friday);
+  const ci = commissionInfo(S.friday);
 
   const sets = countInRange(rows, bk.sets[0], bk.sets[1]);
   const sits = countInRange(rows, bk.sits[0], bk.sits[1]);
+  const comm = ci ? countInRange(rows, ci.start, ci.end) : null;
 
   // Same/next-day only pays when a spiff window covers the sets week.
   // Spiffs change week to week; no window = no spiff, count shows 0.
@@ -401,6 +431,7 @@ function compute(){
     ...Object.keys(S.data.agents),
     ...Object.keys(sets.per), ...Object.keys(sits.per),
     ...Object.keys(spiffPer), ...Object.keys(spiffQty),
+    ...(comm?Object.keys(comm.per):[]),
   ]);
 
   const perAgent = [];
@@ -410,28 +441,34 @@ function compute(){
     const nSits = Math.round(sitBase * CFG.sit_rate);
     const setPay = nSets * CFG.set_bonus;
     const sitPay = nSits * CFG.sit_bonus;
+    let commPay = 0, commAppts = 0;
+    if(comm){
+      commAppts = comm.per[u]||0;
+      commPay = commAppts * CFG.close_rate * CFG.avg_project * CFG.rev_share;
+    }
     const nSpiff = spiffQty[u]||0;
     const manualSpiff = spiffPer[u]||0;
     const spiffPay = nSpiff * spiffRate + manualSpiff;
-    const total = setPay + sitPay + spiffPay;
-    if(nSets===0 && sitBase===0 && spiffPay===0) continue;
+    const total = setPay + sitPay + commPay + spiffPay;
+    if(nSets===0 && sitBase===0 && commAppts===0 && spiffPay===0) continue;
     perAgent.push({
       user:u, name:S.data.agents[u]||u,
-      nSets, setPay, sitBase, nSits, sitPay,
+      nSets, setPay, sitBase, nSits, sitPay, commAppts, commPay,
       nSpiff, manualSpiff, spiffPay, total,
     });
   }
   perAgent.sort((a,b)=>b.total-a.total);
 
-  // Monthly appointment volume for the tile: the selected Friday's calendar month.
+  // Monthly appointment volume for the tiles: commission month when it's a
+  // commission Friday, otherwise the selected Friday's calendar month.
   const f = parse(S.friday);
-  const mStart = iso(new Date(f.getFullYear(), f.getMonth(), 1));
-  const mEnd   = iso(new Date(f.getFullYear(), f.getMonth()+1, 0));
+  const mStart = ci ? ci.start : iso(new Date(f.getFullYear(), f.getMonth(), 1));
+  const mEnd   = ci ? ci.end   : iso(new Date(f.getFullYear(), f.getMonth()+1, 0));
   const month = countInRange(rows, mStart, mEnd);
-  const monthLabel = `${MONTHS[f.getMonth()]} ${f.getFullYear()}`;
+  const monthLabel = ci ? ci.label : `${MONTHS[f.getMonth()]} ${f.getFullYear()}`;
   const monthAppts = Object.values(month.per).reduce((a,n)=>a+n,0);
 
-  return { bk, perAgent, spiffWin:win, unSets:sets.un, unSits:sits.un,
+  return { bk, ci, perAgent, spiffWin:win, unSets:sets.un, unSits:sits.un, unComm:comm?comm.un:0,
            monthAppts, monthLabel };
 }
 
@@ -459,6 +496,7 @@ function kpis(R){
   const totSetPay = R.perAgent.reduce((a,x)=>a+x.setPay,0);
   const totSits = R.perAgent.reduce((a,x)=>a+x.nSits,0);
   const totSitPay = R.perAgent.reduce((a,x)=>a+x.sitPay,0);
+  const totComm = R.perAgent.reduce((a,x)=>a+x.commPay,0);
   const grand = R.perAgent.reduce((a,x)=>a+x.total,0);
 
   const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
@@ -470,6 +508,10 @@ function kpis(R){
       <div class="mc-help">${help}</div>
     </div>`;
 
+  const nextCF = (()=>{ // when is the next commission friday relative to selection
+    const f = parse(S.friday);
+    return commissionFriday(f.getFullYear(), f.getMonth());
+  })();
 
   return `<div class="kpi-row">
     ${tile("c-cyan", ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/>'),
@@ -485,7 +527,7 @@ function kpis(R){
     ${tile("c-green", ic('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
       "Friday Payout", money(grand),
       `${R.perAgent.length} agent${R.perAgent.length===1?"":"s"} · pays ${fmt(S.friday)}`,
-      "")}
+      R.ci ? '<span class="chip info">Commission Friday</span>' : "")}
   </div>`;
 }
 
@@ -497,6 +539,7 @@ function tableCard(R){
       <td class="r mono">${money(x.setPay)}</td>
       <td class="r mono">${x.nSits} <span class="sub">of ${x.sitBase}</span></td>
       <td class="r mono">${money(x.sitPay)}</td>
+      ${R.ci?`<td class="r mono">${x.commAppts}</td><td class="r mono">${money(x.commPay)}</td>`:""}
       <td class="r mono">${x.nSpiff || "—"}</td>
       <td class="r mono">${x.spiffPay ? money(x.spiffPay) : "—"}${
         x.manualSpiff ? `<br><span class="sub">incl. ${money(x.manualSpiff)} manual</span>` : ""}</td>
@@ -508,6 +551,7 @@ function tableCard(R){
       <td class="agent-name">Unattributed <span class="sub">no VICIdial match</span></td>
       <td class="r mono">${R.unSets}</td><td class="r mono">—</td>
       <td class="r mono">${R.unSits}</td><td class="r mono">—</td>
+      ${R.ci?`<td class="r mono">${R.unComm}</td><td class="r mono">—</td>`:""}
       <td class="r mono">—</td>
       <td class="r mono">—</td>
       <td class="r mono">—</td>
@@ -516,20 +560,22 @@ function tableCard(R){
   const t = {
     sets:R.perAgent.reduce((a,x)=>a+x.nSets,0), setPay:R.perAgent.reduce((a,x)=>a+x.setPay,0),
     sits:R.perAgent.reduce((a,x)=>a+x.nSits,0), sitPay:R.perAgent.reduce((a,x)=>a+x.sitPay,0),
+    commA:R.perAgent.reduce((a,x)=>a+x.commAppts,0), comm:R.perAgent.reduce((a,x)=>a+x.commPay,0),
     spiffQty:R.perAgent.reduce((a,x)=>a+x.nSpiff,0),
     spiff:R.perAgent.reduce((a,x)=>a+x.spiffPay,0),
     grand:R.perAgent.reduce((a,x)=>a+x.total,0),
   };
 
   return `<div class="card">
-    <div class="eyebrow">Friday Payout Run</div>
+    <div class="eyebrow">Friday Commission Run</div>
     <h2 class="card-h">Per-Agent Payout — Friday ${fmtLong(S.friday)}</h2>
-    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])} · Spiff: ${R.spiffWin ? `same/next-day $${R.spiffWin[4]}` : "none this week"}</p>
+    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}${R.ci?` · Commission: ${R.ci.label}`:""} · Spiff: ${R.spiffWin ? `same/next-day $${R.spiffWin[4]}` : "none this week"}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr>
         <th>Agent</th><th class="r">Sets</th><th class="r">Set $</th>
         <th class="r">Sits</th><th class="r">Sit $</th>
+        ${R.ci?'<th class="r">Mo. Appts</th><th class="r">Commission</th>':""}
         <th class="r">Spiff</th><th class="r">Spiff $</th>
         <th class="r">Friday Total</th>
       </tr></thead>
@@ -538,6 +584,7 @@ function tableCard(R){
         <td>Total</td>
         <td class="r mono">${t.sets}</td><td class="r mono">${money(t.setPay)}</td>
         <td class="r mono">${t.sits}</td><td class="r mono">${money(t.sitPay)}</td>
+        ${R.ci?`<td class="r mono">${t.commA}</td><td class="r mono">${money(t.comm)}</td>`:""}
         <td class="r mono">${t.spiffQty || "—"}</td>
         <td class="r mono">${t.spiff?money(t.spiff):"—"}</td>
         <td class="r mono">${money(t.grand)}</td>
@@ -654,6 +701,9 @@ document.getElementById("ratesBtn").onclick = ()=>{
   document.getElementById("cfg_sit_bonus").value = CFG.sit_bonus;
   document.getElementById("cfg_spiff_bonus").value = CFG.spiff_bonus;
   document.getElementById("cfg_sit_rate").value = Math.round(CFG.sit_rate*100);
+  document.getElementById("cfg_close_rate").value = +(CFG.close_rate*100).toFixed(2);
+  document.getElementById("cfg_avg_project").value = CFG.avg_project;
+  document.getElementById("cfg_rev_share").value = +(CFG.rev_share*100).toFixed(3);
   document.getElementById("cfgMsg").className = "msg";
   openVeil("ratesVeil");
 };
@@ -665,6 +715,9 @@ document.getElementById("cfgSave").onclick = async ()=>{
     sit_bonus: num("cfg_sit_bonus"),
     spiff_bonus: num("cfg_spiff_bonus"),
     sit_rate: num("cfg_sit_rate")/100,
+    close_rate: num("cfg_close_rate")/100,
+    avg_project: num("cfg_avg_project"),
+    rev_share: num("cfg_rev_share")/100,
   }}, "cfgMsg");
   if(ok){
     const el = document.getElementById("cfgMsg");

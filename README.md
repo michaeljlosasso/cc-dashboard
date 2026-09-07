@@ -1,6 +1,6 @@
 # cc-dashboard
 
-LL.Media Contact Center dashboard — agent payroll (sets/sits/spiffs) and
+LL.Media Contact Center dashboard — agent payroll (sets/sits/commission) and
 VICIdial hours. Standalone frame + embedded sub-widgets, rebuilt off the
 Manus-hosted Contact Center Agent Leaderboard on the GitHub + Cloudflare stack.
 
@@ -28,9 +28,8 @@ One Cloudflare Worker with Workers Assets:
 - **Sits** — $5 × round(60% of appointments from two weeks ago).
 - **Hourly** — $5/hr on daily VICIdial login span (`vicidial_agent_log`,
   first-to-last event), paid Mondays for the previous week.
-- **Spiffs** — same/next-day bookings × spiff rate, only for weeks switched on
-  in `leads.cc_spiff_windows` (Spiffs tab); plus any manual +Spiff awards.
-  The monthly commission was retired Sep 7 2026.
+- **Commission** — on the first Friday on/after the 5th: prior-month appts ×
+  4% × $15,274 × 0.1%.
 - **Attribution** — `appt_setter` never lands in BigQuery, so leads are matched
   to agents by phone against `vicidial_log` + `vicidial_closer_log`
   (APPTBK dispositions preferred, closest to `createdOn`). ~95% match; the rest
