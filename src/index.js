@@ -292,18 +292,48 @@ ORDER BY booked_date
 // Hours = actual logged-in time: talk + wait + pause + dispo + dead seconds.
 // Paused breaks (LUNCH/BRK/ADMIN) count; logged-out time does not. Capped at
 // the day's first-to-last span so overlapping timers can't overpay.
+// Manual adjustments (holidays, flat shifts, dialer outages) live in
+// leads.cc_hours_adjust and are layered on top here. We never write into
+// vicidial_agent_log — that's the dialer's own table and the sync would
+// clobber it. One adjustment row per user per day (enforced by MERGE on
+// write), so 'set' vs 'add' is never ambiguous:
+//   set -> the day's paid hours BECOME this number, logged time ignored
+//   add -> this number is added on top of whatever was logged
+// FULL OUTER JOIN, not LEFT: an agent who never logged in on a holiday has
+// no row in the log at all, and a LEFT join would drop their flat shift.
 const SQL_HOURS = `
+WITH logged AS (
+  SELECT
+    a.user,
+    DATE(a.event_time) AS d,
+    ROUND(LEAST(
+      SUM(IFNULL(a.pause_sec,0)+IFNULL(a.wait_sec,0)+IFNULL(a.talk_sec,0)+IFNULL(a.dispo_sec,0)+IFNULL(a.dead_sec,0)),
+      TIMESTAMP_DIFF(MAX(a.event_time), MIN(a.event_time), SECOND)
+    )/3600.0, 2) AS login_hours,
+    COUNT(DISTINCT a.uniqueid) AS calls
+  FROM \`${PROJECT}.vicidial.vicidial_agent_log\` a
+  WHERE REGEXP_CONTAINS(a.user, r'${AGENT_RE}') AND a.user NOT IN ${EXCLUDED_USERS}
+  GROUP BY a.user, d
+),
+adj AS (
+  SELECT user, work_date AS d, mode, hours, note
+  FROM \`${PROJECT}.leads.cc_hours_adjust\`
+  WHERE REGEXP_CONTAINS(user, r'${AGENT_RE}') AND user NOT IN ${EXCLUDED_USERS}
+)
 SELECT
-  a.user,
-  FORMAT_DATE('%Y-%m-%d', DATE(a.event_time)) AS d,
-  ROUND(LEAST(
-    SUM(IFNULL(a.pause_sec,0)+IFNULL(a.wait_sec,0)+IFNULL(a.talk_sec,0)+IFNULL(a.dispo_sec,0)+IFNULL(a.dead_sec,0)),
-    TIMESTAMP_DIFF(MAX(a.event_time), MIN(a.event_time), SECOND)
-  )/3600.0, 2) AS login_hours,
-  COUNT(DISTINCT a.uniqueid) AS calls
-FROM \`${PROJECT}.vicidial.vicidial_agent_log\` a
-WHERE REGEXP_CONTAINS(a.user, r'${AGENT_RE}') AND a.user NOT IN ${EXCLUDED_USERS}
-GROUP BY a.user, d
+  COALESCE(l.user, j.user) AS user,
+  FORMAT_DATE('%Y-%m-%d', COALESCE(l.d, j.d)) AS d,
+  ROUND(CASE
+    WHEN j.mode = 'set' THEN j.hours
+    WHEN j.mode = 'add' THEN IFNULL(l.login_hours, 0) + j.hours
+    ELSE IFNULL(l.login_hours, 0)
+  END, 2) AS login_hours,
+  IFNULL(l.calls, 0) AS calls,
+  IF(j.user IS NULL, 0, 1) AS adjusted,
+  ROUND(IFNULL(l.login_hours, 0), 2) AS logged_hours,
+  IFNULL(j.note, '') AS adj_note
+FROM logged l
+FULL OUTER JOIN adj j ON l.user = j.user AND l.d = j.d
 ORDER BY d
 `;
 
@@ -409,8 +439,13 @@ async function buildPayload(env) {
     // [booked_date, agent_user|null, campaign, first, last, city, state, sold,
     //  phone, email, appt_at]  — appt_at drives the same/next-day spiff.
     appts: appts.rows,
-    // [user, date, login_hours, calls]
-    hours: hours.rows.map((r) => [r[0], r[1], Number(r[2]), Number(r[3])]),
+    // [user, date, login_hours, calls, adjusted, logged_hours, adj_note]
+    // login_hours is the PAID number (adjustments already applied); columns
+    // 4-6 exist so the Hours widget can show what was really logged and why.
+    hours: hours.rows.map((r) => [
+      r[0], r[1], Number(r[2]), Number(r[3]),
+      Number(r[4]), Number(r[5]), r[6] || "",
+    ]),
     // [id, agent_user, amount, note, award_date]
     spiffs: spiffs.rows.map((r) => [r[0], r[1], Number(r[2]), r[3], r[4]]),
     // [user, date, code, hours]
@@ -574,6 +609,47 @@ async function handleAdmin(request, env, url) {
     return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
   }
 
+  if (url.pathname === "/api/hours-adjust") {
+    const user = String(body.user || "");
+    const date = String(body.work_date || "");
+    const mode = String(body.mode || "set");
+    const hours = Number(body.hours);
+    if (!/^20[0-9]{2}$/.test(user)) throw new Error("bad user");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("bad date");
+    if (mode !== "set" && mode !== "add") throw new Error("bad mode");
+    // 24 is a hard ceiling — a typo like 80 instead of 8.0 would otherwise
+    // sail through and quietly overpay by ten times.
+    if (!Number.isFinite(hours) || hours < 0 || hours > 24) throw new Error("bad hours");
+    // MERGE, not INSERT: one row per user per day keeps set/add unambiguous
+    // and makes re-submitting the same day a correction, not a double entry.
+    await bq(env, `
+      MERGE \`${PROJECT}.leads.cc_hours_adjust\` t
+      USING (SELECT '${user}' AS user, DATE '${date}' AS work_date) s
+        ON t.user = s.user AND t.work_date = s.work_date
+      WHEN MATCHED THEN UPDATE SET
+        mode = '${mode}', hours = ${hours},
+        note = ${sqlStr(body.note || "", 200)}, created_at = CURRENT_TIMESTAMP()
+      WHEN NOT MATCHED THEN INSERT (user, work_date, mode, hours, note, created_at)
+        VALUES (s.user, s.work_date, '${mode}', ${hours},
+                ${sqlStr(body.note || "", 200)}, CURRENT_TIMESTAMP())
+    `);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
+  if (url.pathname === "/api/hours-adjust/delete") {
+    const user = String(body.user || "");
+    const date = String(body.work_date || "");
+    if (!/^20[0-9]{2}$/.test(user)) throw new Error("bad user");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("bad date");
+    await bq(env, `
+      DELETE FROM \`${PROJECT}.leads.cc_hours_adjust\`
+      WHERE user = '${user}' AND work_date = DATE '${date}'
+    `);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
   if (url.pathname === "/api/spiff/delete") {
     const id = String(body.id || "");
     if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("bad id");
@@ -704,6 +780,7 @@ export default {
     /* ---- admin (spiffs + config) ---- */
     if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config"
          || path === "/api/spiff-window" || path === "/api/spiff-window/delete"
+         || path === "/api/hours-adjust" || path === "/api/hours-adjust/delete"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });

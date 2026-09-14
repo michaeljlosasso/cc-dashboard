@@ -57,6 +57,65 @@ body{
 .filter-control .chev{transition:transform 160ms ease;color:#9ca3af}
 .filter-control[aria-expanded="true"] .chev{transform:rotate(180deg)}
 .freshness{margin-left:auto;font-size:.78rem;font-weight:700;color:var(--muted)}
+/* ---- manual hour adjustments ---- */
+.adj{
+  position:relative;color:var(--ll-purple)!important;font-weight:900;
+  background:rgba(138,86,243,.07);border-radius:6px;cursor:help;
+}
+.adj::after{
+  content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;
+  border-radius:50%;background:var(--ll-purple);
+}
+.adj-legend{
+  display:inline-flex;align-items:center;gap:6px;font-size:.78rem;
+  font-weight:800;color:var(--ll-purple);margin-left:10px;
+}
+.adj-legend .dot{width:7px;height:7px;border-radius:50%;background:var(--ll-purple)}
+.admin-link{
+  background:none;border:none;cursor:pointer;font-family:"Nunito";
+  font-size:.78rem;font-weight:800;color:#c7cdd4;padding:0 4px;
+}
+.admin-link:hover{color:var(--ll-purple)}
+.admin-pill{
+  display:inline-flex;align-items:center;gap:6px;min-height:34px;
+  border:1.5px solid rgba(138,86,243,.4);border-radius:999px;background:#fff;
+  color:var(--ll-purple);font-family:"Nunito";font-size:.82rem;font-weight:850;
+  padding:0 14px;cursor:pointer;transition:all 140ms ease;
+}
+.admin-pill:hover{background:rgba(138,86,243,.08)}
+.modal-veil{
+  position:fixed;inset:0;background:rgba(25,23,24,.35);z-index:100;
+  display:none;align-items:flex-start;justify-content:center;padding:60px 20px;
+}
+.modal-veil.open{display:flex}
+.modal{
+  width:min(460px,100%);background:#fff;border-radius:14px;
+  box-shadow:0 22px 54px rgba(25,23,24,.2);padding:22px;
+  max-height:80vh;overflow:auto;
+}
+.modal h3{font-family:"Outfit";font-weight:800;font-size:1.05rem;margin:0 0 14px}
+.modal label{display:block;font-size:.72rem;font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;color:#9ca3af;margin:12px 0 4px}
+.modal input,.modal select{
+  width:100%;border:1.5px solid var(--ll-border);border-radius:9px;padding:9px 12px;
+  font-family:"Nunito";font-size:.95rem;font-weight:700;outline:none;
+}
+.modal input:focus,.modal select:focus{border-color:var(--ll-purple)}
+.modal .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal .btns{display:flex;gap:10px;margin-top:18px;justify-content:flex-end}
+.modal button{
+  border:none;border-radius:9px;padding:10px 18px;font-family:"Nunito";
+  font-weight:900;font-size:.9rem;cursor:pointer;
+}
+.modal .primary{background:var(--ll-purple);color:#fff}
+.modal .ghost{background:#f4f4f5;color:#3f3f46}
+.modal .msg{margin-top:12px;font-size:.83rem;font-weight:800;display:none}
+.modal .msg.ok{color:#007e5c;display:block}
+.modal .msg.bad{color:#b90053;display:block}
+.modal .hint{font-size:.78rem;font-weight:700;color:var(--muted);margin-top:6px;line-height:1.45}
+.adj-list{margin-top:16px;border-top:1px solid #f1f2f4;padding-top:10px}
+.adj-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.85rem;font-weight:700}
+.adj-row .del{margin-left:auto;background:none;border:none;color:#b90053;cursor:pointer;font-weight:900;padding:2px 6px}
 .pop-wrap{position:relative}
 .pop{
   position:absolute;top:calc(100% + 8px);left:0;z-index:60;display:none;
@@ -148,8 +207,39 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900}
       <div class="pop" id="wkPop"><div class="pop-list" id="wkList"></div></div>
     </div>
     <div class="freshness" id="freshness">Loading…</div>
+    <span id="adminControls" style="display:none">
+      <button class="admin-pill" id="adjBtn">+ Adjust Hours</button>
+    </span>
+    <button class="admin-link" id="adminLink" title="Admin">Admin</button>
   </div>
   <div id="content"></div>
+</div>
+
+<!-- admin: manual hour adjustment -->
+<div class="modal-veil" id="adjVeil">
+  <div class="modal">
+    <h3>Adjust Hours</h3>
+    <label>Agent</label>
+    <select id="ajAgent"></select>
+    <div class="row2">
+      <div><label>Date</label><input id="ajDate" type="date" /></div>
+      <div><label>Hours</label><input id="ajHours" type="number" min="0" max="24" step="0.25" placeholder="8" /></div>
+    </div>
+    <label>Mode</label>
+    <select id="ajMode">
+      <option value="set">Set — pay exactly this, ignore logged time</option>
+      <option value="add">Add — on top of whatever was logged</option>
+    </select>
+    <p class="hint" id="ajHint"></p>
+    <label>Reason</label>
+    <input id="ajNote" placeholder="Labor Day — flat holiday shift" />
+    <div class="btns">
+      <button class="ghost" data-close>Cancel</button>
+      <button class="primary" id="ajSave">Save Adjustment</button>
+    </div>
+    <div class="msg" id="ajMsg"></div>
+    <div class="adj-list" id="adjList"></div>
+  </div>
 </div>
 
 <script>
@@ -221,17 +311,23 @@ function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&
 function compute(){
   const a = S.week, b = iso(addDays(parse(S.week),6));
   const days = []; for(let i=0;i<7;i++) days.push(iso(addDays(parse(S.week),i)));
-  const per = {}; // user -> {byDay:{}, total, calls}
-  for(const [u,d,h,calls] of S.data.hours){
+  const per = {}; // user -> {byDay:{}, adjDay:{}, total, calls, adjCount}
+  // h is the PAID number — the Worker already applied any adjustment. adjusted
+  // and logged tell us whether to flag the cell and what it really was.
+  for(const [u,d,h,calls,adjusted,logged,note] of S.data.hours){
     if(d<a || d>b) continue;
-    if(!per[u]) per[u] = { byDay:{}, total:0, calls:0 };
+    if(!per[u]) per[u] = { byDay:{}, adjDay:{}, total:0, calls:0, adjCount:0 };
     per[u].byDay[d] = (per[u].byDay[d]||0)+h;
+    if(adjusted){
+      per[u].adjDay[d] = { logged: logged||0, note: note||"" };
+      per[u].adjCount++;
+    }
     per[u].total += h; per[u].calls += calls;
   }
   const rows = Object.entries(per).map(([u,v])=>({
     user:u, name:S.data.agents[u]||u, ...v, pay:v.total*HOURLY_RATE,
   })).sort((x,y)=>y.total-x.total);
-  return { days, rows };
+  return { days, rows, anyAdj: rows.some(r=>r.adjCount>0) };
 }
 
 function render(){
@@ -341,8 +437,11 @@ function tableCard(R){
     <tr>
       <td class="agent-name">${esc(x.name)} <span class="sub">${esc(x.user)}</span></td>
       ${R.days.map(d=>{
-        const v = x.byDay[d];
-        return `<td class="r mono${v?"":" zero"}">${v?hrs(v):"—"}</td>`;
+        const v = x.byDay[d], aj = x.adjDay[d];
+        if(!aj) return `<td class="r mono${v?"":" zero"}">${v?hrs(v):"—"}</td>`;
+        const tip = `Manually adjusted${aj.note?" — "+aj.note:""}`
+          + ` · VICIdial logged ${hrs(aj.logged)} hr`;
+        return `<td class="r mono adj" title="${esc(tip)}">${hrs(v||0)}</td>`;
       }).join("")}
       <td class="r mono" style="font-weight:900">${hrs(x.total)}</td>
     </tr>`).join("");
@@ -352,7 +451,9 @@ function tableCard(R){
   return `<div class="card">
     <div class="eyebrow">VICIdial Login Time</div>
     <h2 class="card-h">Hours by Agent — Week of ${fmt(S.week)}</h2>
-    <p class="card-sub">Daily login span per agent</p>
+    <p class="card-sub">Daily login span per agent${R.anyAdj
+      ? `<span class="adj-legend"><span class="dot"></span>manually adjusted — hover for the reason</span>`
+      : ""}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr><th>Agent</th>${head}<th class="r">Total Hrs</th></tr></thead>
@@ -377,6 +478,124 @@ wkBtn.onclick = (e)=>{
 };
 document.addEventListener("click", (e)=>{ if(!wkPop.contains(e.target)) closePop(); });
 document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closePop(); });
+
+/* ------------------------------------------------------------------ admin */
+const A = { pc: sessionStorage.getItem("cc_admin_pc") || "" };
+
+function showAdminControls(){
+  document.getElementById("adminControls").style.display = A.pc ? "inline-flex" : "none";
+  document.getElementById("adminLink").textContent = A.pc ? "Lock" : "Admin";
+}
+showAdminControls();
+
+document.getElementById("adminLink").onclick = ()=>{
+  if(A.pc){ A.pc=""; sessionStorage.removeItem("cc_admin_pc"); showAdminControls(); return; }
+  const pc = prompt("Admin passcode:");
+  if(!pc) return;
+  A.pc = pc; sessionStorage.setItem("cc_admin_pc", pc); showAdminControls();
+};
+
+function closeVeils(){ document.querySelectorAll(".modal-veil").forEach(v=>v.classList.remove("open")); }
+document.querySelectorAll("[data-close]").forEach(b=> b.onclick = closeVeils);
+document.querySelectorAll(".modal-veil").forEach(v=> v.addEventListener("click", e=>{ if(e.target===v) closeVeils(); }));
+
+async function adminPost(path, payload, msgEl){
+  const el = document.getElementById(msgEl);
+  el.className = "msg";
+  const r = await fetch(path, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ admin: A.pc, ...payload }),
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.error){
+    el.textContent = j.error || `HTTP ${r.status}`; el.className = "msg bad";
+    return false;
+  }
+  return true;
+}
+
+async function reloadData(){
+  const r = await fetch("/api/data?refresh=1", { cache:"no-store" });
+  const j = await r.json();
+  if(r.ok && !j.error){ S.data = j; render(); }
+}
+
+/* ---- adjustment dialog ---- */
+// Every adjusted day in the dataset, newest first — the Worker flags them on
+// the hours rows, so we don't need a second endpoint just to list them.
+function adjustments(){
+  return (S.data && S.data.hours || [])
+    .filter(r => r[4])
+    .map(r => ({ user:r[0], date:r[1], paid:r[2], logged:r[5], note:r[6] }))
+    .sort((a,b)=> b.date.localeCompare(a.date));
+}
+
+function renderAdjList(){
+  const list = document.getElementById("adjList");
+  const rows = adjustments().slice(0, 12);
+  list.innerHTML = rows.length
+    ? "<label>Recent adjustments</label>" + rows.map(a=>`
+        <div class="adj-row">
+          <span>${esc(fmt(a.date))}</span>
+          <span style="font-weight:850">${esc((S.data.agents||{})[a.user]||a.user)}</span>
+          <span class="mono">${hrs(a.paid)} hr</span>
+          <span class="sub">${esc(a.note || "—")}</span>
+          <button class="del" data-u="${esc(a.user)}" data-d="${esc(a.date)}" title="Remove">×</button>
+        </div>`).join("")
+    : "<label>Recent adjustments</label><div class=\"sub\" style=\"font-size:.83rem;font-weight:700\">None yet.</div>";
+  list.querySelectorAll(".del").forEach(b=> b.onclick = async ()=>{
+    if(!confirm("Remove this adjustment? The day reverts to VICIdial logged time.")) return;
+    if(await adminPost("/api/hours-adjust/delete",
+        { user:b.dataset.u, work_date:b.dataset.d }, "ajMsg")){
+      await reloadData(); renderAdjList();
+    }
+  });
+}
+
+// Shows what the agent actually logged that day, so "set 8" on a day they
+// worked 5.5 is an informed choice rather than a silent overwrite.
+function updateAjHint(){
+  const u = document.getElementById("ajAgent").value;
+  const d = document.getElementById("ajDate").value;
+  const mode = document.getElementById("ajMode").value;
+  const h = Number(document.getElementById("ajHours").value) || 0;
+  const el = document.getElementById("ajHint");
+  if(!u || !d){ el.textContent = ""; return; }
+  const row = (S.data.hours||[]).find(r=> r[0]===u && r[1]===d);
+  const logged = row ? (row[4] ? row[5] : row[2]) : 0;
+  const result = mode === "add" ? logged + h : h;
+  el.innerHTML = `VICIdial logged <strong>${hrs(logged)} hr</strong> that day. `
+    + `This agent will be paid for <strong>${hrs(result)} hr</strong>.`;
+}
+
+document.getElementById("adjBtn").onclick = ()=>{
+  const sel = document.getElementById("ajAgent");
+  sel.innerHTML = Object.entries(S.data.agents||{})
+    .map(([u,n])=>`<option value="${esc(u)}">${esc(n)}</option>`).join("");
+  document.getElementById("ajDate").value = iso(new Date());
+  document.getElementById("ajMsg").className = "msg";
+  updateAjHint(); renderAdjList();
+  document.getElementById("adjVeil").classList.add("open");
+};
+
+["ajAgent","ajDate","ajMode","ajHours"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", updateAjHint);
+});
+
+document.getElementById("ajSave").onclick = async ()=>{
+  const ok = await adminPost("/api/hours-adjust", {
+    user: document.getElementById("ajAgent").value,
+    work_date: document.getElementById("ajDate").value,
+    mode: document.getElementById("ajMode").value,
+    hours: Number(document.getElementById("ajHours").value),
+    note: document.getElementById("ajNote").value,
+  }, "ajMsg");
+  if(ok){
+    const el = document.getElementById("ajMsg");
+    el.textContent = "Adjustment saved."; el.className = "msg ok";
+    await reloadData(); renderAdjList(); updateAjHint();
+  }
+};
 
 load();
 </script>

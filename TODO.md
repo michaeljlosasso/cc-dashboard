@@ -20,6 +20,14 @@
   - Once `appointment_date` flows in from Make, compute same/next-day ($5 each) automatically
   - Retires the manual weekly spiff paste
 
+- [x] **Manual hour adjustments** — `leads.cc_hours_adjust`, layered over VICIdial in `SQL_HOURS`.
+      Admin → "+ Adjust Hours" in the Hours widget. Two modes: `set` (pay exactly this, ignore
+      logged time) and `add` (on top of logged). One row per user per day, MERGE on write, so
+      re-submitting a day is a correction not a double entry. Adjusted cells show purple with a
+      hover reason. Seeded: Labor Day Mon Sep 7 2026 — 8 hr flat for 2002/2004/2007/2008, 6 hr
+      for 2009 (Andres), `set` mode so Jonathan's 5.52 logged is replaced, not stacked.
+      NOTE: we never write to `vicidial.vicidial_agent_log` — the dialer sync would clobber it.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
