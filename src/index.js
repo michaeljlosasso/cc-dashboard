@@ -459,6 +459,31 @@ async function buildPayload(env) {
 
 /* ------------------------------------------------------------- admin ops */
 
+/* ------------------------------------------------------ widget pass ----
+ * A short-lived bearer token that lets a widget on another origin trust a
+ * request that started here. It proves one thing only: "this browser held a
+ * valid cc-dashboard session at time T". It carries no identity and no
+ * permissions, so a leaked pass is worth 15 minutes of the widget and nothing
+ * else. The signing secret never leaves the Worker — the frame only ever sees
+ * the finished pass.
+ */
+// Reuses the b64url() defined up top for the Google JWT signing — same
+// no-padding, URL-safe encoding, and it already takes an ArrayBuffer.
+async function mintWidgetPass(secret, aud) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { v: 1, aud, src: "cc", iat: now, exp: now + 900 };
+  const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return `${body}.${b64url(sig)}`;
+}
+
 function isAdmin(body, env) {
   return !!env.ADMIN_PASSCODE && body && body.admin === env.ADMIN_PASSCODE;
 }
@@ -808,6 +833,26 @@ export default {
           headers: JSON_HEADERS,
         });
       }
+      if (path === "/api/widget-pass") {
+        const widget = url.searchParams.get("widget") || "";
+        if (widget !== "reverse-lookup") {
+          return new Response(JSON.stringify({ error: "unknown widget" }), {
+            status: 400, headers: JSON_HEADERS,
+          });
+        }
+        if (!env.WIDGET_PASS_SECRET) {
+          return new Response(JSON.stringify({ error: "widget pass not configured" }), {
+            status: 500, headers: JSON_HEADERS,
+          });
+        }
+        const pass = await mintWidgetPass(env.WIDGET_PASS_SECRET, "reverse-lookup");
+        // no-store, always: a cached pass is a pass that outlives its 15 minutes
+        // and can be replayed by the next person on a shared machine.
+        return new Response(JSON.stringify({ pass }), {
+          headers: { ...JSON_HEADERS, "Cache-Control": "no-store" },
+        });
+      }
+
       if (path === "/api/data") {
         const bust = url.searchParams.get("refresh") === "1";
         const cache = caches.default;

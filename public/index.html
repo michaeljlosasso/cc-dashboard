@@ -205,6 +205,9 @@ const NAV_SECTIONS = [
       { icon: "search", label: "Call Finder", path: "https://call-finder.llmedia.info",
         sub: "Search, play, download and export VICIdial call recordings",
         chat: "https://claude.ai/cowork/cse_0165bgtZDJZhAdRuvgq25DNM" },
+      { icon: "search", label: "Lookup", path: "https://reverse-lookup.llmedia.info/cc/",
+        sub: "Who's behind a phone number or address",
+        chat: "https://claude.ai/cowork/cse_015shaQKikMZLJk2af8u7EUR" },
     ],
   },
   {
@@ -263,6 +266,42 @@ NAV_SECTIONS.forEach(sec => {
   el.appendChild(head); el.appendChild(items); nav.appendChild(el);
 });
 
+/* ---------------------------------------------- widget pass handshake ----
+ * Reverse Lookup lives on its own origin and can't see our session cookie, so
+ * it asks us for a short-lived signed pass instead. Three things must all be
+ * true before we answer, and each one closes a different hole:
+ *   origin  — only that exact host, so any other page's message is ignored
+ *   source  — only the frame we're currently showing, so a hidden iframe or a
+ *             popup that guessed the message shape gets nothing
+ *   shape   — the exact request type and widget name
+ * The pass goes back via postMessage with an explicit target origin. It never
+ * touches the URL, localStorage or sessionStorage: a URL leaks through history,
+ * referrers and server logs, and storage outlives the session that earned it.
+ */
+const LOOKUP_ORIGIN = "https://reverse-lookup.llmedia.info";
+let currentFrame = null;
+
+window.addEventListener("message", async (event) => {
+  if (event.origin !== LOOKUP_ORIGIN) return;
+  if (!currentFrame || event.source !== currentFrame.contentWindow) return;
+  const d = event.data;
+  if (!d || d.type !== "llmedia:widget-pass-request" || d.widget !== "reverse-lookup") return;
+
+  try {
+    const r = await fetch("/api/widget-pass?widget=reverse-lookup", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.pass) return;
+    event.source.postMessage(
+      { type: "llmedia:widget-pass", widget: "reverse-lookup", pass: j.pass },
+      LOOKUP_ORIGIN
+    );
+  } catch (_) { /* widget shows its own error state */ }
+});
+
 function select(item, btn, secColor){
   document.querySelectorAll(".item.active").forEach(x => {
     x.classList.remove("active");
@@ -286,6 +325,9 @@ function select(item, btn, secColor){
   // clipboard-write lets widgets with a "copy link" button use the native
   // clipboard API (Call Finder asked for it); harmless for the others.
   holder.innerHTML = `<iframe src="${item.path}" title="${item.label}" allow="clipboard-write"></iframe>`;
+  // Tracked so the widget-pass handshake can verify the request came from the
+  // frame we're actually showing, not some other window that knows the shape.
+  currentFrame = holder.querySelector("iframe");
   // Slug from the label, not the path — external widget URLs made ugly hashes.
   try { history.replaceState(null, "", "#" + item.label.toLowerCase().replace(/\W+/g, "-")); } catch(_){}
 }
