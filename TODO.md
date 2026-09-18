@@ -45,7 +45,7 @@
 | Commission | in-repo `/widgets/payroll/` | admin: +Spiff, Rates |
 | Hours | in-repo `/widgets/hours/` | logged-in time only; breaks card |
 | Appointments | in-repo `/widgets/appointments/` | no revenue data shown |
-| Zips | `llmedia-zip-lookup-widget.michael-5fa.workers.dev` | migrated off Manus Aug 20; `?code=` gate |
+| Zips | `llmedia-zip-lookup-widget.michael-5fa.workers.dev` | migrated off Manus Aug 20; `?code=` gate. Repo `michaeljlosasso/llmedia-zip-lookup-widget` (see its HANDOFF.md — the deployed Worker source is NOT in that repo). Own chat: cse_01YB9G6vT8MbrnkFJoWp85ir |
 
 ## Reference
 
