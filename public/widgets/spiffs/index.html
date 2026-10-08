@@ -232,7 +232,7 @@ function render(){
   if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load spiffs.</strong><br>${esc(S.err)}</div>`; return; }
   if(!S.data){ c.innerHTML = `<div class="card skel" style="height:150px"></div><div class="card skel" style="height:260px;margin-top:14px"></div>`; return; }
   if(!S.months.length) buildMonths();
-  c.innerHTML = trackerKpis() + trackerCard() + historyCard() + windowsCard();
+  c.innerHTML = trackerKpis() + trackerCard() + windowsCard();
   wire();
 }
 
@@ -404,35 +404,6 @@ function trackerCard(){
     <div class="rule">
       <span>⚡</span>
       <span><strong>How it pays:</strong> on spiff weeks, every appointment you book for the same day or the next day pays extra on that Friday. Transfers don't count. Upcoming Fridays show what's earned so far.</span>
-    </div>
-  </div>`;
-}
-
-function historyCard(){
-  if(S.months.length < 2) return "";
-  const months = [...S.months].reverse();   // oldest -> newest, left to right
-  const data = months.map(ym => monthData(ym));
-  const users = new Map();
-  data.forEach(M => M.rows.forEach(r => users.set(r.user, r.name)));
-  const totFor = (M,u) => { const r = M.rows.find(x => x.user === u); return r ? r.tot.amt : 0; };
-  const rows = [...users].map(([u,name]) => ({ u, name, vals: data.map(M => totFor(M,u)) }))
-    .map(r => ({ ...r, all: r.vals.reduce((a,b) => a+b, 0) }))
-    .sort((a,b) => b.all - a.all);
-  const cur = ymOf(new Date());
-  return `<div class="card">
-    <div class="eyebrow">Month by Month</div>
-    <h2 class="card-h">Spiff earnings since they started</h2>
-    <p class="card-sub">Each month = the Friday paydays inside it${months.includes(cur)?` · ${MONTHS[parse(cur+"-01").getMonth()]} is month to date`:""}</p>
-    <div class="tbl-scroll" style="margin-top:14px">
-    <table>
-      <thead><tr><th>Agent</th>${months.map(ym => `<th class="r">${MONTHS[parse(ym+"-01").getMonth()].slice(0,3)} ${ym.slice(0,4)}</th>`).join("")}<th class="r">All Time</th></tr></thead>
-      <tbody>${rows.map(r => `<tr>
-        <td class="agent-name">${esc(r.name)}</td>
-        ${r.vals.map(v => `<td class="r mono${v?"":" zero"}">${money(v)}</td>`).join("")}
-        <td class="r"><span class="total-pill${r.all?"":" zero"}">${money(r.all)}</span></td>
-      </tr>`).join("")}</tbody>
-      <tfoot><tr><td>Team</td>${data.map(M => `<td class="r mono">${money(M.team.amt)}</td>`).join("")}<td class="r mono">${money(data.reduce((s,M) => s + M.team.amt, 0))}</td></tr></tfoot>
-    </table>
     </div>
   </div>`;
 }

@@ -32,7 +32,7 @@
       table, month-by-month history; the on/off schedule stays underneath. A month = the Friday
       paydays inside it (Manny's call: matches deposits, nothing split). Spiffs only, not sets/sits.
       Spiff math is COPIED from widgets/payroll — change both together. Nav: Spiffs moved to
-      Payroll, Appointments moved to Team.
+      Payroll, Appointments moved to Team. Month-by-month history card and ON/OFF tiles removed (Manny).
 
 ## Parked
 
