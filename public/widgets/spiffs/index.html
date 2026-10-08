@@ -249,7 +249,6 @@ function render(){
  */
 const A_DATE = 0, A_USER = 1, A_CAMPAIGN = 2, A_APPT_AT = 10;
 const isTransfer = (campaign) => /transfer/i.test(campaign || "");
-const FIRST_SPIFF_MONTH = "2026-09";   // first payday with a spiff: Fri Sep 4, 2026
 
 function setsWeekFor(fridayIso){          // the week a Friday pays: Mon–Sun before it
   const f = parse(fridayIso);
@@ -277,9 +276,18 @@ function spiffForFriday(fridayIso){
     if(d >= a && d <= b){
       per[u] = per[u] || {n:0, amt:0};
       per[u].amt += amt; manual = true;
+      // Hand-entered same/next spiffs record their count in the note
+      // ("... — 18 appts (wk Jul 27)"). Use it when present; other manual
+      // spiffs (contests etc.) have no count and add $ only.
+      const m = String(note||"").match(/(\d+)\s+appts?\b/i);
+      if(m) per[u].n += Number(m[1]);
     }
   }
-  return { per, win, manual, setsWeek:[a,b], on: !!win || manual };
+  // Hand-entered spiff notes read like "Same/next-day bonus — 18 appts (wk Jul 27)";
+  // the part before " — " is the description, the rest is per-agent detail.
+  const manualNotes = [...new Set((S.data.spiffs||[])
+    .filter(sp => sp[4] >= a && sp[4] <= b).map(sp => String(sp[3]||"").split(" — ")[0].trim()).filter(Boolean))];
+  return { per, win, manual, manualNotes, setsWeek:[a,b], on: !!win || manual };
 }
 function fridaysIn(ym){
   const [y,m] = ym.split("-").map(Number); const out = [];
@@ -298,8 +306,17 @@ function buildMonths(){
     const payFri = addDays(mondayOf(parse(w[3])), 11);   // Fri after the window's week
     if(ymOf(payFri) > last) last = ymOf(payFri);
   }
+  // First month = the earliest payday that ever paid a spiff, from either a
+  // spiff window or a hand-entered spiff. (Aug 2026 had hand-entered ones.)
+  let first = last;
+  for(const w of (S.data.spiff_windows||[])){
+    const m = ymOf(addDays(mondayOf(parse(w[3])), 11)); if(m < first) first = m;
+  }
+  for(const sp of (S.data.spiffs||[])){
+    const m = ymOf(addDays(mondayOf(parse(sp[4])), 11)); if(m < first) first = m;
+  }
   const out = [];
-  for(let d = parse(FIRST_SPIFF_MONTH + "-01"); ymOf(d) <= last; d = new Date(d.getFullYear(), d.getMonth()+1, 1))
+  for(let d = parse(first + "-01"); ymOf(d) <= last; d = new Date(d.getFullYear(), d.getMonth()+1, 1))
     out.push(ymOf(d));
   S.months = out.reverse();
   const cur = ymOf(new Date());
@@ -416,44 +433,63 @@ document.addEventListener("keydown", (e) => { if(e.key === "Escape") closePop();
 function weekOf(d){ const m = mondayOf(d); return [iso(m), iso(addDays(m,6))]; }
 
 function windowsCard(){
-  const today = iso(new Date());
-  const rows = (S.data.spiff_windows||[]).map(w=>{
-    const [id,kind,s,e,rate,note] = w;
-    const state = e < today ? ["p-past","Ended"] : s > today ? ["p-future","Scheduled"] : ["p-live","Live"];
+  // One row per Friday payday in the selected month, mirroring the columns of
+  // the earnings table above: which week's bookings it pays, what the spiff
+  // was, the rate, how many bookings qualified, and what it paid the team.
+  const M = monthData(S.month);
+  const rows = M.fris.map(f => {
+    const [a,b] = f.setsWeek;
+    const payout = Object.values(f.per).reduce((s,v) => s + v.amt, 0);
+    const n = Object.values(f.per).reduce((s,v) => s + v.n, 0);
+    let desc, rate, qual;
+    if(f.win){
+      desc = esc(f.win[5] || KINDS[f.win[1]] || f.win[1]);
+      if(f.manual) desc += `<span class="sub"> + ${esc(f.manualNotes.join(", ") || "other spiffs")}</span>`;
+      rate = `${money(f.win[4])} each`; qual = String(n);
+    } else if(f.manual){
+      desc = esc(f.manualNotes.join(", ") || "Spiff");
+      const each = n ? payout / n : 0;
+      rate = n && Number.isInteger(each) ? `${money(each)} each` : `<span class="sub">varies</span>`;
+      qual = n ? String(n) : "—";
+    } else {
+      desc = `<span class="sub">No spiff</span>`; rate = "—"; qual = "—";
+    }
+    const del = A.pc && f.win ? `<button class="del" data-id="${esc(f.win[0])}" title="Turn this spiff off">✕</button>` : "";
     return `<tr>
-      <td><span class="pill ${state[0]}">${state[1]}</span></td>
-      <td class="kind">${esc(KINDS[kind]||kind)}</td>
-      <td class="mono">${fmt(s)} – ${fmt(e)}</td>
-      <td class="r mono">${money(rate)}</td>
-      <td class="sub">${esc(note)}</td>
-      <td class="r"><button class="del" data-id="${esc(id)}" ${A.pc?"":"disabled"} title="Remove">✕</button></td>
+      <td class="agent-name">Fri ${fmt(f.date)}${f.upcoming?` <span class="pill p-future">Upcoming</span>`:""}</td>
+      <td class="mono">${fmt(a)} – ${fmt(b)}</td>
+      <td class="kind">${desc}</td>
+      <td class="r mono">${rate}</td>
+      <td class="r mono">${qual}</td>
+      <td class="r mono">${f.on ? money(payout) : "—"}</td>
+      ${A.pc ? `<td class="r">${del}</td>` : ""}
     </tr>`;
   }).join("");
 
-  // default the form to next week — that's the one you're usually deciding about
+  // Admin: turn a spiff on. Defaults to next week, the one usually being decided.
   const nxt = weekOf(addDays(new Date(),7));
   const form = A.pc ? `
     <div class="form">
-      <div><label>Spiff</label>
+      <div><label>Spiff type</label>
         <select id="f_kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
-      <div><label>Week starts (Mon)</label><input type="date" id="f_start" value="${nxt[0]}"></div>
-      <div><label>Week ends (Sun)</label><input type="date" id="f_end" value="${nxt[1]}"></div>
+      <div><label>Bookings from (Mon)</label><input type="date" id="f_start" value="${nxt[0]}"></div>
+      <div><label>Bookings to (Sun)</label><input type="date" id="f_end" value="${nxt[1]}"></div>
       <div><label>$ each</label><input type="number" id="f_rate" step="0.5" min="0" value="5"></div>
-      <div style="grid-column:1/-1"><label>Note (optional)</label><input type="text" id="f_note" placeholder="e.g. Labor Day push"></div>
+      <div style="grid-column:1/-1"><label>Description agents see</label><input type="text" id="f_note" value="Same-day or next-day appointments"></div>
     </div>
     <div class="form-actions">
-      <button class="btn pri" id="f_save">Turn on for these dates</button>
+      <button class="btn pri" id="f_save">Turn spiff on</button>
       <span class="msg" id="f_msg"></span>
-    </div>` : `<div class="locked">Hit <strong>Admin</strong> to add or remove spiff weeks.</div>`;
+    </div>` : "";
 
   return `<div class="card">
-    <div class="eyebrow">Spiff Weeks</div>
-    <h2 class="card-h">When a spiff is switched on</h2>
-    <p class="card-sub">Commission only pays the spiff for weeks listed here. Everything else is $0.</p>
+    <div class="eyebrow">Spiff Details</div>
+    <h2 class="card-h">Spiff by week — ${monthLabel(S.month)}</h2>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
-      <thead><tr><th>Status</th><th>Spiff</th><th>Week</th><th class="r">Rate</th><th>Note</th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="6" class="sub" style="padding:26px;text-align:center">No spiff weeks yet.</td></tr>`}</tbody>
+      <thead><tr><th>Payday</th><th>Bookings Made</th><th>Spiff</th><th class="r">Rate</th><th class="r">Qualifying</th><th class="r">Payout</th>${A.pc?"<th></th>":""}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="empty">No paydays this month.</td></tr>`}</tbody>
+      <tfoot><tr><td>Total</td><td></td><td></td><td></td><td class="r mono">${M.team.n}</td><td class="r mono">${money(M.team.amt)}</td>${A.pc?"<td></td>":""}</tr></tfoot>
     </table>
     </div>
     ${form}
@@ -492,6 +528,7 @@ function wire(){
   };
   document.querySelectorAll(".del").forEach(b => b.onclick = async ()=>{
     if(!A.pc) return;
+    if(!confirm("Turn this spiff off? That week's spiff payout drops to $0 on the Commission tab.")) return;
     b.disabled = true;
     const ok = await adminPost("/api/spiff-window/delete", { id: b.dataset.id }, null);
     if(ok) await reload(); else b.disabled = false;
