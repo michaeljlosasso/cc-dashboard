@@ -107,12 +107,80 @@ tbody tr:hover{background:#fafafa}
 .err{border:1px solid rgba(244,0,112,.3);background:rgba(244,0,112,.05);color:#b90053;border-radius:14px;padding:18px;font-weight:750}
 .skel{background:linear-gradient(90deg,#f1f2f4 25%,#e9eaec 50%,#f1f2f4 75%);background-size:200% 100%;animation:sh 1.3s infinite;border-radius:8px}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ---- month picker (matches Hours/Commission) ---- */
+.filter-bar{position:relative;z-index:40}
+.filter-control{
+  display:inline-flex;align-items:center;gap:9px;min-height:40px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;
+  color:var(--ll-black);font-family:"Nunito",sans-serif;font-size:.93rem;
+  font-weight:850;padding:0 16px;box-shadow:0 1px 2px rgba(25,23,24,.04);
+  cursor:pointer;transition:border-color 160ms ease,box-shadow 160ms ease;white-space:nowrap;
+}
+.filter-control:hover,.filter-control[aria-expanded="true"]{
+  border-color:rgba(138,86,243,.62); box-shadow:0 7px 18px rgba(138,86,243,.08);
+}
+.filter-control .chev{transition:transform 160ms ease;color:#9ca3af}
+.filter-control[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.pop-wrap{position:relative}
+.pop{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:60;display:none;
+  width:min(300px,calc(100vw - 48px));border:1px solid rgba(229,231,235,.94);
+  border-radius:13px;background:#fff;
+  box-shadow:0 22px 54px rgba(25,23,24,.14),0 2px 8px rgba(25,23,24,.08);overflow:hidden;
+}
+.pop.open{display:block}
+.pop-list{max-height:340px;overflow:auto;padding:8px}
+.pop-item{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;
+  cursor:pointer;font-size:.9rem;font-weight:750;color:#3f3f46;transition:background 140ms ease;
+}
+.pop-item:hover{background:#f4f4f5}
+.pop-item.on{background:rgba(0,197,255,.12);color:#0094aa;font-weight:850}
+.pop-item .tag{
+  margin-left:auto;font-size:.66rem;font-weight:900;letter-spacing:.06em;
+  border-radius:999px;padding:2px 8px;color:#007e5c;background:rgba(0,181,128,.12);
+}
+/* ---- tracker ---- */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.mc-top{display:flex;align-items:flex-start;justify-content:space-between}
+.chip{display:inline-flex;align-items:center;gap:2px;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:850}
+.chip.live{color:#007e5c;background:rgba(0,181,128,.10)}
+.c-yellow{color:#c9a400} .c-cyan{color:#00a6d6}
+.mono{font-variant-numeric:tabular-nums}
+.agent-name{font-weight:850}
+th .fri{display:block;font-size:.62rem;letter-spacing:.06em;margin-top:3px;font-weight:900}
+th .fri.off{color:#c7cdd4} th .fri.up{color:var(--ll-purple)} th .fri.on{color:#00a37a}
+td.zero{color:#c7cdd4}
+td .n{color:var(--muted);font-size:.74rem;font-weight:800;margin-left:4px}
+.total-pill{
+  display:inline-block;min-width:76px;text-align:center;border-radius:999px;padding:5px 12px;
+  font-family:"Outfit",sans-serif;font-weight:900;font-size:.95rem;
+  color:#007e5c;background:rgba(0,181,128,.12);
+}
+.total-pill.zero{color:#9ca3af;background:#f1f2f4}
+tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900;white-space:nowrap}
+.rule{
+  display:flex;gap:10px;align-items:flex-start;font-size:.84rem;font-weight:700;color:var(--muted);
+  background:rgba(0,197,255,.06);border:1px solid rgba(0,197,255,.18);border-radius:12px;padding:12px 14px;margin-top:14px;
+}
+.rule strong{color:var(--ll-black)}
+.empty{color:var(--muted);font-weight:700;padding:26px;text-align:center}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="filter-bar">
-    <span class="card-sub">Programmatic spiffs turn on per week. No window, no spiff.</span>
+    <div class="pop-wrap">
+      <button class="filter-control" id="moBtn" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span id="moLabel">—</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="moPop"><div class="pop-list" id="moList"></div></div>
+    </div>
     <div class="freshness" id="freshness">Loading…</div>
     <button class="admin-btn" id="adminBtn">Admin</button>
   </div>
@@ -124,7 +192,7 @@ tbody tr:hover{background:#fafafa}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const KINDS = { same_next: "Same / next-day appointment" };
-const S = { data:null, err:null };
+const S = { data:null, err:null, month:null, months:[] };
 const A = { pc: sessionStorage.getItem("cc_admin_pc") || "" };
 
 const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -165,9 +233,222 @@ function render(){
   document.getElementById("adminBtn").textContent = A.pc ? "Admin ✓" : "Admin";
   if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load spiffs.</strong><br>${esc(S.err)}</div>`; return; }
   if(!S.data){ c.innerHTML = `<div class="card skel" style="height:150px"></div><div class="card skel" style="height:260px;margin-top:14px"></div>`; return; }
-  c.innerHTML = statusCards() + windowsCard();
+  if(!S.months.length) buildMonths();
+  c.innerHTML = trackerKpis() + trackerCard() + historyCard() + statusCards() + windowsCard();
   wire();
 }
+
+/* ------------------------------------------------------- spiff tracker ----
+ * One question per agent: "what did spiffs pay me this month?"
+ *
+ * A month = the Friday paydays that fall inside it. That matches the deposits
+ * agents actually see, every Friday belongs to exactly one month, and nothing
+ * is split. Months with five Fridays will read bigger; the tiles say how many
+ * Fridays a month had so that's never a surprise.
+ *
+ * The per-Friday amount MUST equal the Spiff $ column on the Commission tab.
+ * The three helpers below are copied from widgets/payroll — buckets(),
+ * spiffCounts(), and the window/manual-spiff rules in compute(). If you change
+ * how spiffs pay there, change it here too.
+ */
+const A_DATE = 0, A_USER = 1, A_CAMPAIGN = 2, A_APPT_AT = 10;
+const isTransfer = (campaign) => /transfer/i.test(campaign || "");
+const FIRST_SPIFF_MONTH = "2026-09";   // first payday with a spiff: Fri Sep 4, 2026
+
+function setsWeekFor(fridayIso){          // the week a Friday pays: Mon–Sun before it
+  const f = parse(fridayIso);
+  const monThis = addDays(f, -((f.getDay()+6)%7));
+  return [iso(addDays(monThis,-7)), iso(addDays(monThis,-1))];
+}
+function spiffForFriday(fridayIso){
+  const [a,b] = setsWeekFor(fridayIso);
+  const win = (S.data.spiff_windows||[]).find(w => w[1]==="same_next" && w[2] <= b && w[3] >= a);
+  const per = {};  // user -> {n, amt}
+  if(win){
+    for(const r of S.data.appts){
+      const d = r[A_DATE]; if(!d || d < a || d > b) continue;
+      const u = r[A_USER], at = r[A_APPT_AT];
+      if(!u || !at || isTransfer(r[A_CAMPAIGN])) continue;
+      const days = Math.round((parse(at.slice(0,10)) - parse(d)) / 86400000);
+      if(days === 0 || days === 1){
+        per[u] = per[u] || {n:0, amt:0};
+        per[u].n += 1; per[u].amt += win[4];
+      }
+    }
+  }
+  let manual = false;
+  for(const [id,u,amt,note,d] of (S.data.spiffs||[])){
+    if(d >= a && d <= b){
+      per[u] = per[u] || {n:0, amt:0};
+      per[u].amt += amt; manual = true;
+    }
+  }
+  return { per, win, manual, setsWeek:[a,b], on: !!win || manual };
+}
+function fridaysIn(ym){
+  const [y,m] = ym.split("-").map(Number); const out = [];
+  for(let d = new Date(y,m-1,1); d.getMonth() === m-1; d = addDays(d,1))
+    if(d.getDay() === 5) out.push(iso(d));
+  return out;
+}
+const ymOf = d => iso(d).slice(0,7);
+const monthLabel = ym => { const [y,m] = ym.split("-").map(Number); return `${MONTHS[m-1]} ${y}`; };
+
+function buildMonths(){
+  // From the first spiff payday through this month — or later, if a spiff
+  // week is already scheduled whose payday lands in a future month.
+  let last = ymOf(new Date());
+  for(const w of (S.data.spiff_windows||[])){
+    const payFri = addDays(mondayOf(parse(w[3])), 11);   // Fri after the window's week
+    if(ymOf(payFri) > last) last = ymOf(payFri);
+  }
+  const out = [];
+  for(let d = parse(FIRST_SPIFF_MONTH + "-01"); ymOf(d) <= last; d = new Date(d.getFullYear(), d.getMonth()+1, 1))
+    out.push(ymOf(d));
+  S.months = out.reverse();
+  const cur = ymOf(new Date());
+  S.month = S.months.includes(cur) ? cur : S.months[0];
+  const prev = ymOf(new Date(new Date().getFullYear(), new Date().getMonth()-1, 1));
+  document.getElementById("moList").innerHTML = S.months.map(ym => {
+    const tag = ym === cur ? "THIS MONTH" : ym === prev ? "LAST MONTH" : "";
+    return `<div class="pop-item${ym===S.month?" on":""}" data-m="${ym}">${monthLabel(ym)}${tag?`<span class="tag">${tag}</span>`:""}</div>`;
+  }).join("");
+  document.querySelectorAll("#moList .pop-item").forEach(el => el.onclick = () => {
+    S.month = el.dataset.m;
+    document.querySelectorAll("#moList .pop-item").forEach(x => x.classList.toggle("on", x.dataset.m === S.month));
+    closePop(); render();
+  });
+}
+
+function monthData(ym){
+  const today = iso(new Date());
+  const fris = fridaysIn(ym).map(f => ({ date:f, upcoming: f > today, ...spiffForFriday(f) }));
+  const tot = {};   // user -> {n, amt}
+  for(const f of fris) for(const [u,v] of Object.entries(f.per)){
+    tot[u] = tot[u] || {n:0, amt:0}; tot[u].n += v.n; tot[u].amt += v.amt;
+  }
+  // Show everyone who booked anything in the month's pay weeks, so a $0 is
+  // visible as a $0 rather than silently missing.
+  const users = new Set(Object.keys(tot));
+  if(fris.length){
+    const a = fris[0].setsWeek[0], b = fris[fris.length-1].setsWeek[1];
+    for(const r of S.data.appts) if(r[A_USER] && r[A_DATE] >= a && r[A_DATE] <= b) users.add(r[A_USER]);
+  }
+  const rows = [...users].map(u => ({ user:u, name:(S.data.agents||{})[u] || u, tot: tot[u] || {n:0, amt:0} }))
+    .sort((x,y) => y.tot.amt - x.tot.amt || x.name.localeCompare(y.name));
+  const team = rows.reduce((s,r) => ({ n:s.n + r.tot.n, amt:s.amt + r.tot.amt }), {n:0, amt:0});
+  return { fris, rows, team };
+}
+
+function trackerKpis(){
+  document.getElementById("moLabel").textContent = monthLabel(S.month);
+  const M = monthData(S.month);
+  const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const tile = (cls,icon,label,value,help,chip) => `
+    <div class="card metric-card ${cls}">
+      <div class="mc-top"><div class="badge">${icon}</div>${chip||""}</div>
+      <div class="mc-label">${label}</div>
+      <div class="mc-value">${value}</div>
+      <div class="mc-help">${help}</div>
+    </div>`;
+  const paid = M.fris.filter(f => f.on).length;
+  const top = M.rows[0];
+  const isCur = S.month === ymOf(new Date());
+  const upcoming = M.fris.filter(f => f.upcoming).length;
+  return `<div class="kpi-row">
+    ${tile("c-green", ic('<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+      "Team Spiffs", money(M.team.amt),
+      isCur ? `earned so far this month${upcoming?` · ${upcoming} payday${upcoming>1?"s":""} to go`:""}` : `paid in ${MONTHS[parse(S.month+"-01").getMonth()]}`,
+      isCur ? '<span class="chip live">↗ Live</span>' : "")}
+    ${tile("c-yellow", ic('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>'),
+      "Top Earner", top && top.tot.amt > 0 ? money(top.tot.amt) : "—",
+      top && top.tot.amt > 0 ? esc(top.name) : "no spiffs yet this month")}
+    ${tile("c-purple", ic('<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>'),
+      "Same / Next-Day", String(M.team.n), "qualifying bookings paid")}
+    ${tile("c-cyan", ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
+      "Spiff Paydays", `${paid} of ${M.fris.length}`, `Fridays in ${MONTHS[parse(S.month+"-01").getMonth()]} that paid a spiff`)}
+  </div>`;
+}
+
+function trackerCard(){
+  const M = monthData(S.month);
+  if(!M.rows.length) return `<div class="card"><div class="empty">No paydays with bookings in ${monthLabel(S.month)} yet.</div></div>`;
+  const head = M.fris.map(f => {
+    const st = f.upcoming ? ["up","UPCOMING"] : f.on ? ["on","SPIFF ON"] : ["off","NO SPIFF"];
+    return `<th class="r">Fri ${fmt(f.date).split(" ")[1]}<span class="fri ${st[0]}">${st[1]}</span></th>`;
+  }).join("");
+  const cell = (f,u) => {
+    const v = f.per[u];
+    if(!f.on) return `<td class="r mono zero">—</td>`;
+    if(!v || !v.amt) return `<td class="r mono zero">$0</td>`;
+    return `<td class="r mono">${money(v.amt)}${v.n?`<span class="n">×${v.n}</span>`:""}</td>`;
+  };
+  const body = M.rows.map(r => `<tr>
+      <td class="agent-name">${esc(r.name)}</td>
+      ${M.fris.map(f => cell(f, r.user)).join("")}
+      <td class="r"><span class="total-pill${r.tot.amt?"":" zero"}">${money(r.tot.amt)}</span></td>
+    </tr>`).join("");
+  const colTot = M.fris.map(f => {
+    const t = Object.values(f.per).reduce((s,v) => s + v.amt, 0);
+    return `<td class="r mono">${f.on ? money(t) : "—"}</td>`;
+  }).join("");
+  return `<div class="card">
+    <div class="eyebrow">Spiff Earnings</div>
+    <h2 class="card-h">What spiffs paid — ${monthLabel(S.month)}</h2>
+    <p class="card-sub">Each Friday's spiff, for the bookings made the week before it</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Agent</th>${head}<th class="r">Month Total</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td>Team</td>${colTot}<td class="r mono">${money(M.team.amt)}</td></tr></tfoot>
+    </table>
+    </div>
+    <div class="rule">
+      <span>⚡</span>
+      <span><strong>How it pays:</strong> on spiff weeks, every appointment you book for the same day or the next day pays extra on that Friday. Transfers don't count. Upcoming Fridays show what's earned so far.</span>
+    </div>
+  </div>`;
+}
+
+function historyCard(){
+  if(S.months.length < 2) return "";
+  const months = [...S.months].reverse();   // oldest -> newest, left to right
+  const data = months.map(ym => monthData(ym));
+  const users = new Map();
+  data.forEach(M => M.rows.forEach(r => users.set(r.user, r.name)));
+  const totFor = (M,u) => { const r = M.rows.find(x => x.user === u); return r ? r.tot.amt : 0; };
+  const rows = [...users].map(([u,name]) => ({ u, name, vals: data.map(M => totFor(M,u)) }))
+    .map(r => ({ ...r, all: r.vals.reduce((a,b) => a+b, 0) }))
+    .sort((a,b) => b.all - a.all);
+  const cur = ymOf(new Date());
+  return `<div class="card">
+    <div class="eyebrow">Month by Month</div>
+    <h2 class="card-h">Spiff earnings since they started</h2>
+    <p class="card-sub">Each month = the Friday paydays inside it${months.includes(cur)?` · ${MONTHS[parse(cur+"-01").getMonth()]} is month to date`:""}</p>
+    <div class="tbl-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Agent</th>${months.map(ym => `<th class="r">${MONTHS[parse(ym+"-01").getMonth()].slice(0,3)} ${ym.slice(0,4)}</th>`).join("")}<th class="r">All Time</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td class="agent-name">${esc(r.name)}</td>
+        ${r.vals.map(v => `<td class="r mono${v?"":" zero"}">${money(v)}</td>`).join("")}
+        <td class="r"><span class="total-pill${r.all?"":" zero"}">${money(r.all)}</span></td>
+      </tr>`).join("")}</tbody>
+      <tfoot><tr><td>Team</td>${data.map(M => `<td class="r mono">${money(M.team.amt)}</td>`).join("")}<td class="r mono">${money(data.reduce((s,M) => s + M.team.amt, 0))}</td></tr></tfoot>
+    </table>
+    </div>
+  </div>`;
+}
+
+const moBtn = document.getElementById("moBtn");
+const moPop = document.getElementById("moPop");
+function closePop(){ moPop.classList.remove("open"); moBtn.setAttribute("aria-expanded","false"); }
+moBtn.onclick = (e) => {
+  e.stopPropagation();
+  const open = moPop.classList.toggle("open");
+  moBtn.setAttribute("aria-expanded", open ? "true" : "false");
+};
+document.addEventListener("click", (e) => { if(!moPop.contains(e.target)) closePop(); });
+document.addEventListener("keydown", (e) => { if(e.key === "Escape") closePop(); });
 
 function weekOf(d){ const m = mondayOf(d); return [iso(m), iso(addDays(m,6))]; }
 function activeFor(range){

@@ -28,6 +28,12 @@
       for 2009 (Andres), `set` mode so Jonathan's 5.52 logged is replaced, not stacked.
       NOTE: we never write to `vicidial.vicidial_agent_log` — the dialer sync would clobber it.
 
+- [x] **Spiffs tab is now an earnings tracker** (Oct 8 2026). Month picker, tiles, per-Friday
+      table, month-by-month history; the on/off schedule stays underneath. A month = the Friday
+      paydays inside it (Manny's call: matches deposits, nothing split). Spiffs only, not sets/sits.
+      Spiff math is COPIED from widgets/payroll — change both together. Nav: Spiffs moved to
+      Payroll, Appointments moved to Team.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
