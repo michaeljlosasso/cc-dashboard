@@ -367,13 +367,27 @@ function trackerKpis(){
   const paid = M.fris.filter(f => f.on).length;
   const isCur = S.month === ymOf(new Date());
   const upcoming = M.fris.filter(f => f.upcoming).length;
+  // Middle tile works for any kind of spiff: the next Friday that pays (what's
+  // earned toward it so far), or for a finished month, its last payday.
+  const today = iso(new Date());
+  const ahead = M.fris.filter(f => f.date >= today);
+  const paidFris = M.fris.filter(f => f.on);
+  const pf = ahead.length ? ahead[0]
+           : (paidFris.length ? paidFris[paidFris.length-1] : M.fris[M.fris.length-1]);
+  const pfAmt = pf ? Object.values(pf.per).reduce((s,v) => s + v.amt, 0) : 0;
+  const pfDesc = !pf ? "" : pf.win ? (pf.win[5] || "spiff") : pf.manual ? (pf.manualNotes[0] || "spiff") : "no spiff that week";
+  const nextPay = {
+    label: ahead.length ? "Next Payday" : "Last Spiff Payday",
+    amt: pfAmt,
+    help: pf ? `Fri ${fmt(pf.date)} · ${esc(pfDesc)}` : "no paydays this month",
+  };
   return `<div class="kpi-row">
     ${tile("c-green", ic('<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
       "Team Spiffs", money(M.team.amt),
       isCur ? `earned so far this month${upcoming?` · ${upcoming} payday${upcoming>1?"s":""} to go`:""}` : `paid in ${MONTHS[parse(S.month+"-01").getMonth()]}`,
       isCur ? '<span class="chip live">↗ Live</span>' : "")}
     ${tile("c-purple", ic('<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>'),
-      "Same / Next-Day", String(M.team.n), "qualifying bookings paid")}
+      nextPay.label, money(nextPay.amt), nextPay.help)}
     ${tile("c-cyan", ic('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
       "Spiff Paydays", `${paid} of ${M.fris.length}`, `Fridays in ${MONTHS[parse(S.month+"-01").getMonth()]} that paid a spiff`)}
   </div>`;
