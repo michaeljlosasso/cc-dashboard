@@ -54,8 +54,6 @@ body{
 .admin-btn:hover{border-color:rgba(138,86,243,.62)}
 .admin-btn.on{background:var(--ll-purple);border-color:var(--ll-purple);color:#fff}
 
-/* this-week status */
-.status{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .metric-card{position:relative;overflow:hidden}
 .metric-card::after{
   content:"";position:absolute;right:-22px;bottom:-38px;width:112px;height:112px;
@@ -234,7 +232,7 @@ function render(){
   if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load spiffs.</strong><br>${esc(S.err)}</div>`; return; }
   if(!S.data){ c.innerHTML = `<div class="card skel" style="height:150px"></div><div class="card skel" style="height:260px;margin-top:14px"></div>`; return; }
   if(!S.months.length) buildMonths();
-  c.innerHTML = trackerKpis() + trackerCard() + historyCard() + statusCards() + windowsCard();
+  c.innerHTML = trackerKpis() + trackerCard() + historyCard() + windowsCard();
   wire();
 }
 
@@ -451,29 +449,6 @@ document.addEventListener("click", (e) => { if(!moPop.contains(e.target)) closeP
 document.addEventListener("keydown", (e) => { if(e.key === "Escape") closePop(); });
 
 function weekOf(d){ const m = mondayOf(d); return [iso(m), iso(addDays(m,6))]; }
-function activeFor(range){
-  return (S.data.spiff_windows||[]).find(w => w[2] <= range[1] && w[3] >= range[0]);
-}
-
-function statusCards(){
-  const today = new Date();
-  const thisWk = weekOf(today), nextWk = weekOf(addDays(today,7));
-  const a = activeFor(thisWk), b = activeFor(nextWk);
-  const ic = p => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
-  const bolt = ic('<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>');
-  const tile = (cls,label,value,help) => `
-    <div class="card metric-card ${cls}">
-      <div class="badge">${bolt}</div>
-      <div class="mc-label">${label}</div>
-      <div class="mc-value">${value}</div>
-      <div class="mc-help">${help}</div>
-    </div>`;
-  const desc = w => w ? `${KINDS[w[1]]||w[1]} · ${money(w[4])} each` : "no spiff running";
-  return `<div class="status">
-    ${tile(a?"c-green":"c-dim", `This week · ${fmt(thisWk[0])} – ${fmt(thisWk[1])}`, a?"ON":"OFF", desc(a))}
-    ${tile(b?"c-purple":"c-dim", `Next week · ${fmt(nextWk[0])} – ${fmt(nextWk[1])}`, b?"ON":"OFF", desc(b))}
-  </div>`;
-}
 
 function windowsCard(){
   const today = iso(new Date());
