@@ -182,7 +182,9 @@ body{
   <div class="filter-bar">
     <div class="seg" id="seg">
       <button data-p="week" class="on">This Week</button>
+      <button data-p="lastweek">Last Week</button>
       <button data-p="month">This Month</button>
+      <button data-p="lastmonth">Last Month</button>
     </div>
     <button class="admin-btn" id="adminBtn" title="Set targets">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -227,13 +229,30 @@ const colorFor = u => COLORS[(Object.keys(S.data.agents).sort().indexOf(u) + 6) 
 
 /* -------------------------------------------------------- period window */
 
+// "month"/"lastmonth" use monthly targets; the "last" periods are finished,
+// so they report a final result instead of pace.
+const isMonth = () => S.period === "month" || S.period === "lastmonth";
+const isPast  = () => S.period === "lastweek" || S.period === "lastmonth";
+
 function windowOf(){
   const now = new Date();
+  if(S.period === "lastmonth"){
+    const a = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const b = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { a:iso(a), b:iso(b), label:`${MONTHS[a.getMonth()]} ${a.getFullYear()}`,
+             elapsed: b.getDate(), total: b.getDate() };
+  }
   if(S.period === "month"){
     const a = new Date(now.getFullYear(), now.getMonth(), 1);
     const b = new Date(now.getFullYear(), now.getMonth()+1, 0);
     return { a:iso(a), b:iso(b), label:`${MONTHS[now.getMonth()]} ${now.getFullYear()}`,
              elapsed: now.getDate(), total: b.getDate() };
+  }
+  if(S.period === "lastweek"){
+    const a = addDays(mondayOf(now), -7), b = addDays(a,6);
+    return { a:iso(a), b:iso(b),
+             label:`Week of ${MONTHS[a.getMonth()].slice(0,3)} ${a.getDate()}`,
+             elapsed: 6, total: 6 };
   }
   const a = mondayOf(now), b = addDays(a,6);
   // Mon=1 … Sun=7. Saturday is a working day here, so the week is 6 long for
@@ -263,11 +282,11 @@ function targetFor(u){
   const c = S.data.config || {};
   const wk = Number(c["goal_" + u] || 0);
   if(!wk) return 0;
-  return S.period === "month" ? Math.round(wk * WEEKS_PER_MONTH) : wk;
+  return isMonth() ? Math.round(wk * WEEKS_PER_MONTH) : wk;
 }
 function teamTarget(){
   const c = S.data.config || {};
-  const t = Number(c[S.period === "month" ? "goal_team_month" : "goal_team_week"] || 0);
+  const t = Number(c[isMonth() ? "goal_team_month" : "goal_team_week"] || 0);
   if(t) return t;
   // No team target set — fall back to the sum of the individual ones so the
   // hero bar is never a divide-by-zero.
@@ -322,7 +341,7 @@ function hero(w, team){
   return `<div class="card hero${hit?" hit":""}">
     <div class="hero-head">
       <div class="badge">${ic}</div>
-      <span class="chip">${hit ? "🎉 Goal hit" : ahead ? "↗ Ahead of pace" : "Behind pace"}</span>
+      <span class="chip">${hit ? "🎉 Goal hit" : isPast() ? "Final" : ahead ? "↗ Ahead of pace" : "Behind pace"}</span>
     </div>
     <div class="eyebrow" style="margin:14px 0 0">Team Goal · ${esc(w.label)}</div>
     <div class="hero-top" style="margin-top:6px">
@@ -334,6 +353,7 @@ function hero(w, team){
         <div class="hero-pct">${pct}%</div>
         <div class="hero-note">${
           hit ? "Goal smashed"
+              : isPast() ? `Missed by ${left}`
               : left === 1 ? "1 to go"
               : `${left} to go`}</div>
       </div>
@@ -343,7 +363,7 @@ function hero(w, team){
       ${!hit && pace < 100 ? `<div class="pace-mark" style="left:${pace}%"></div>` : ""}
     </div>
     <div class="hero-legend">
-      <span><i class="dot" style="background:linear-gradient(90deg,var(--ll-cyan),var(--ll-green))"></i> Booked so far</span>
+      <span><i class="dot" style="background:linear-gradient(90deg,var(--ll-cyan),var(--ll-green))"></i> ${isPast() ? "Booked" : "Booked so far"}</span>
       ${!hit && pace < 100 ? `<span><i class="dot" style="background:rgba(25,23,24,.3)"></i> On-pace marker (${pace}%)</span>` : ""}
     </div>
   </div>`;
