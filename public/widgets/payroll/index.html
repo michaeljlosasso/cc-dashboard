@@ -410,6 +410,16 @@ function countInRange(rows, a, b){
   return { per, un };
 }
 
+// Header text for the week's spiff. Spiffs change week to week, so this
+// names what ran: the window's description, any hand-entered spiffs, or none.
+function spiffLabel(R){
+  const manual = R.perAgent.reduce((s,x)=>s + (x.manualSpiff||0), 0);
+  const parts = [];
+  if(R.spiffWin) parts.push(`${R.spiffWin[5] || "same/next-day"} $${R.spiffWin[4]} each`);
+  if(manual) parts.push(`${money(manual)} entered by hand`);
+  return parts.length ? parts.join(" + ") : "none this week";
+}
+
 function compute(){
   const rows = S.data.appts;
   const bk = buckets(S.friday);
@@ -574,7 +584,7 @@ function tableCard(R){
   return `<div class="card">
     <div class="eyebrow">Friday Commission Run</div>
     <h2 class="card-h">Per-Agent Payout — Friday ${fmtLong(S.friday)}</h2>
-    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}${R.ci?` · Commission: ${R.ci.label}`:""} · Spiff: ${R.spiffWin ? `same/next-day $${R.spiffWin[4]}` : "none this week"}</p>
+    <p class="card-sub">Sets: ${fmt(R.bk.sets[0])} – ${fmt(R.bk.sets[1])} · Sits: ${fmt(R.bk.sits[0])} – ${fmt(R.bk.sits[1])}${R.ci?` · Commission: ${R.ci.label}`:""} · Spiff: ${spiffLabel(R)}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr>
