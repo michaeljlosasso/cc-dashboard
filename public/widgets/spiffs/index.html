@@ -158,11 +158,9 @@ td .n{color:var(--muted);font-size:.74rem;font-weight:800;margin-left:4px}
 }
 .total-pill.zero{color:#9ca3af;background:#f1f2f4}
 tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900;white-space:nowrap}
-.rule{
   display:flex;gap:10px;align-items:flex-start;font-size:.84rem;font-weight:700;color:var(--muted);
   background:rgba(0,197,255,.06);border:1px solid rgba(0,197,255,.18);border-radius:12px;padding:12px 14px;margin-top:14px;
 }
-.rule strong{color:var(--ll-black)}
 .empty{color:var(--muted);font-weight:700;padding:26px;text-align:center}
 </style>
 </head>
@@ -400,10 +398,6 @@ function trackerCard(){
       <tbody>${body}</tbody>
       <tfoot><tr><td>Team</td>${colTot}<td class="r mono">${money(M.team.amt)}</td></tr></tfoot>
     </table>
-    </div>
-    <div class="rule">
-      <span>⚡</span>
-      <span><strong>How it pays:</strong> on spiff weeks, every appointment you book for the same day or the next day pays extra on that Friday. Transfers don't count. Upcoming Fridays show what's earned so far.</span>
     </div>
   </div>`;
 }
