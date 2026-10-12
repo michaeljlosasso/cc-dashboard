@@ -420,6 +420,16 @@ function spiffLabel(R){
   return parts.length ? parts.join(" + ") : "none this week";
 }
 
+// Sub-line under an agent's spiff dollars: how many qualifying bookings at
+// what rate, and any hand-entered amount when it's mixed with a spiff week.
+// A week that's entirely hand-entered gets no sub-line; the header says so.
+function spiffDetail(x, R){
+  const bits = [];
+  if(x.nSpiff && R.spiffWin) bits.push(`${x.nSpiff} × $${R.spiffWin[4]}`);
+  if(x.manualSpiff && x.nSpiff) bits.push(`+ ${money(x.manualSpiff)} by hand`);
+  return bits.length ? `<br><span class="sub">${bits.join(" ")}</span>` : "";
+}
+
 function compute(){
   const rows = S.data.appts;
   const bk = buckets(S.friday);
@@ -555,9 +565,7 @@ function tableCard(R){
       <td class="r mono">${x.nSits} <span class="sub">of ${x.sitBase}</span></td>
       <td class="r mono">${money(x.sitPay)}</td>
       ${R.ci?`<td class="r mono">${x.commAppts}</td><td class="r mono">${money(x.commPay)}</td>`:""}
-      <td class="r mono">${x.nSpiff || "—"}</td>
-      <td class="r mono">${x.spiffPay ? money(x.spiffPay) : "—"}${
-        x.manualSpiff ? `<br><span class="sub">incl. ${money(x.manualSpiff)} manual</span>` : ""}</td>
+      <td class="r mono">${x.spiffPay ? money(x.spiffPay) : "—"}${spiffDetail(x, R)}</td>
       <td class="r"><span class="total-pill mono">${money(x.total)}</span></td>
     </tr>`).join("");
 
@@ -567,7 +575,6 @@ function tableCard(R){
       <td class="r mono">${R.unSets}</td><td class="r mono">—</td>
       <td class="r mono">${R.unSits}</td><td class="r mono">—</td>
       ${R.ci?`<td class="r mono">${R.unComm}</td><td class="r mono">—</td>`:""}
-      <td class="r mono">—</td>
       <td class="r mono">—</td>
       <td class="r mono">—</td>
     </tr>` : "";
@@ -591,16 +598,15 @@ function tableCard(R){
         <th>Agent</th><th class="r">Sets</th><th class="r">Set $</th>
         <th class="r">Sits</th><th class="r">Sit $</th>
         ${R.ci?'<th class="r">Mo. Appts</th><th class="r">Commission</th>':""}
-        <th class="r">Spiff</th><th class="r">Spiff $</th>
+        <th class="r">Spiff</th>
         <th class="r">Friday Total</th>
       </tr></thead>
-      <tbody>${rows || `<tr><td colspan="11" class="sub" style="padding:30px;text-align:center">No appointments in these windows.</td></tr>`}${un}</tbody>
+      <tbody>${rows || `<tr><td colspan="10" class="sub" style="padding:30px;text-align:center">No appointments in these windows.</td></tr>`}${un}</tbody>
       <tfoot><tr>
         <td>Total</td>
         <td class="r mono">${t.sets}</td><td class="r mono">${money(t.setPay)}</td>
         <td class="r mono">${t.sits}</td><td class="r mono">${money(t.sitPay)}</td>
         ${R.ci?`<td class="r mono">${t.commA}</td><td class="r mono">${money(t.comm)}</td>`:""}
-        <td class="r mono">${t.spiffQty || "—"}</td>
         <td class="r mono">${t.spiff?money(t.spiff):"—"}</td>
         <td class="r mono">${money(t.grand)}</td>
       </tr></tfoot>
