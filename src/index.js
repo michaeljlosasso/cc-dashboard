@@ -219,6 +219,15 @@ WITH sold AS (
   SELECT leadID,
          RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph,
          createdOn, sold, phone_home, email_address,
+         -- Leadspedia's createdOn is Eastern wall-clock time; the Make feed's
+         -- set_at is a real UTC timestamp. Reading createdOn as UTC put them
+         -- 4 hours apart and, for a phone booked twice in one day, matched
+         -- the wrong setter (Oct 13: Felix's GES Bath went to Bernardo).
+         -- Corrected from the first unpaid week (Oct 5, 2026) onward ONLY:
+         -- earlier weeks are already paid as originally attributed, and with
+         -- no payroll snapshots a global fix would rewrite paid history
+         -- (27 bookings back to April). Don't move this cutoff earlier.
+         TIMESTAMP(createdOn, IF(createdOn >= DATETIME '2026-10-05', 'America/New_York', 'UTC')) AS created_ts,
          campaignName, first_name, last_name, city, state
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes'  -- unsold appts count too (Manny, Aug 7 2026)
@@ -260,13 +269,13 @@ picked AS (
     ANY_VALUE(s.email_address) AS email,
     ARRAY_AGG(mi.setter_key IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] AS set_by_id,
     ARRAY_AGG(mp.setter_key IGNORE NULLS
-      ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), SECOND))
+      ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, s.created_ts, SECOND))
       LIMIT 1)[SAFE_OFFSET(0)] AS set_by_phone,
     -- Appointment time comes from whichever map row matched this lead, ordered
     -- the same way, so a repeat caller can't inherit a later booking's date.
     ARRAY_AGG(mi.appointment_at IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] AS appt_at_id,
     ARRAY_AGG(mp.appointment_at IGNORE NULLS
-      ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), SECOND))
+      ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, s.created_ts, SECOND))
       LIMIT 1)[SAFE_OFFSET(0)] AS appt_at_phone,
     ARRAY_AGG(c.user IGNORE NULLS
       ORDER BY IF(c.status='APPTBK',0,1),
@@ -275,7 +284,7 @@ picked AS (
   FROM sold s
   LEFT JOIN map mi ON mi.map_lead_id = s.leadID
   LEFT JOIN map mp ON mp.ph = s.ph
-    AND ABS(TIMESTAMP_DIFF(mp.set_at, TIMESTAMP(s.createdOn), HOUR)) <= 168
+    AND ABS(TIMESTAMP_DIFF(mp.set_at, s.created_ts, HOUR)) <= 168
   LEFT JOIN agent_calls c ON c.ph = s.ph
   GROUP BY s.leadID, s.createdOn
 )

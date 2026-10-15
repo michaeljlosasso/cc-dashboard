@@ -34,6 +34,13 @@
       Spiff math is COPIED from widgets/payroll — change both together. Nav: Spiffs moved to
       Payroll, Appointments moved to Team. Month-by-month history card and ON/OFF tiles removed (Manny).
 
+- [ ] **Timezone bug in phone-tier attribution, fixed only from Oct 5 2026.** Leadspedia createdOn
+      is Eastern; Make's set_at is UTC; the query compared them as the same zone. Fixed via
+      created_ts in SQL_APPTS_V2 with a cutoff at the first unpaid week. A global fix would
+      move 27 historical bookings (Apr–Sep, incl. Sep 16 + Sep 22 already paid). Revisit only
+      together with payroll snapshots. The VICIdial call-tier comparison was NOT changed
+      (call_date's zone unverified).
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
