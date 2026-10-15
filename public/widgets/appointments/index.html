@@ -125,8 +125,9 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
 .qa{display:inline-block;min-width:40px;text-align:center;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:900;cursor:default}
 .qa.yes{color:#007e5c;background:rgba(0,181,128,.12)}
 .qa.no{color:#b90053;background:rgba(244,0,112,.10)}
-.qa.unk{color:#8a6d00;background:rgba(255,217,0,.18)}
-.qa.na{color:#a1a1aa;background:#f4f4f5}
+.qa.unclear{color:#8a6d00;background:rgba(255,217,0,.20)}
+.qa.notasked{color:#5b3fb0;background:rgba(138,86,243,.12)}
+.qa.none{color:#c4c4c8;background:transparent;min-width:0;padding:3px 4px}
 .rv-tag{
   display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
   font-size:.68rem;font-weight:900;color:#8a6d00;background:rgba(255,217,0,.22);vertical-align:1px;cursor:default;
@@ -189,6 +190,20 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
       </button>
       <div class="pop" id="dpPop"><div class="pop-list" id="dpList"></div></div>
     </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="crBtn" aria-expanded="false">
+        <span id="crLabel">Credit: All</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="crPop"><div class="pop-list" id="crList"></div></div>
+    </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="hoBtn" aria-expanded="false">
+        <span id="hoLabel">Homeowner: All</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="hoPop"><div class="pop-list" id="hoList"></div></div>
+    </div>
     <div class="freshness" id="freshness">Loading…</div>
   </div>
   <div id="content"></div>
@@ -200,7 +215,7 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -235,7 +250,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter();
+    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -317,6 +332,8 @@ function filtered(){
       if(!d) return false;
       if(S.dup === "cross" && d.agents.size < 2) return false;
     }
+    if(S.credit && qaVal(r,"credit") !== S.credit) return false;
+    if(S.home && qaVal(r,"home") !== S.home) return false;
     return true;
   }).sort((x,y)=> y[0] < x[0] ? -1 : y[0] > x[0] ? 1 : 0);
 }
@@ -407,10 +424,11 @@ function tableCard(rows){
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
       dupNote(rows)}</p>
     <div class="qa-legend">Credit &amp; Homeowner, from the call recording:
-      <span class="qa yes">Yes</span> confirmed
-      <span class="qa no">No</span> not asked or failed
-      <span class="qa unk">?</span> unclear
-      <span class="qa na">—</span> not scored or transfer
+      <span class="qa yes">Yes</span>
+      <span class="qa no">No</span>
+      <span class="qa unclear">Unclear</span>
+      <span class="qa notasked">Not Asked</span>
+      <span class="qa none">—</span> not scored yet or transfer · hover a pill for the quote
     </div>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
@@ -435,34 +453,58 @@ function wirePager(rows){
 /* ---- Call QA ----
  * S.data.appt_qa[lead_id] = [credit, credit_reason, credit_quote, homeowners,
  *   homeowners_reason, homeowners_quote, needs_review, review_reason]
- * Pass -> Yes; Fail / Not Asked -> No; Unclear -> ?; anything else -> —.
+ * Four outcomes (Manny): Yes = Pass, No = Fail, Unclear, Not Asked.
+ * Not scored yet / transfers / anything else -> blank "—" (key "none").
  * Transfers are never scored on qualification: the dialer list doesn't always
  * say "transfer" (an eLocal transfer can ride a HomeFix list), so the
  * Leadspedia campaign name decides.
  */
 const QA_TOPICS = { credit:"Credit", home:"Homeowner" };
+const QA_OUT = {
+  yes:      { txt:"Yes",       head:"confirmed on the call" },
+  no:       { txt:"No",        head:"failed" },
+  unclear:  { txt:"Unclear",   head:"unclear" },
+  notasked: { txt:"Not Asked", head:"not asked on the call" },
+  none:     { txt:"—",         head:"not scored" },
+};
+const QA_MAP = { "Pass":"yes", "Fail":"no", "Unclear":"unclear", "Not Asked":"notasked" };
+const isTransfer = r => /transfer/i.test(String(r[2]||""));
+const qaRow = r => (S.data.appt_qa||{})[r[11]] || null;
+function qaVal(r, topic){
+  if(isTransfer(r)) return "none";
+  const q = qaRow(r); if(!q) return "none";
+  return QA_MAP[String((topic==="credit" ? q[0] : q[3]) || "")] || "none";
+}
 const humanize = s => { s = String(s||"").replace(/_/g," ").trim(); return s ? s[0].toUpperCase()+s.slice(1) : ""; };
 function qaPill(r, topic){
-  const label = QA_TOPICS[topic];
-  const q = (S.data.appt_qa||{})[r[11]];
-  let cls="na", txt="—", head=`${label}: not scored yet`, why="", quote="";
-  if(/transfer/i.test(String(r[2]||""))){
-    head = `${label}: not required (transfer)`;
-  }else if(q){
-    const [v, reason, qt] = topic==="credit" ? [q[0],q[1],q[2]] : [q[3],q[4],q[5]];
-    const val = String(v||"");
-    if(val==="Pass"){ cls="yes"; txt="Yes"; head=`${label}: confirmed on the call`; }
-    else if(val==="Fail"){ cls="no"; txt="No"; head=`${label}: failed`; }
-    else if(val==="Not Asked"){ cls="no"; txt="No"; head=`${label}: not asked on the call`; }
-    else if(val==="Unclear"){ cls="unk"; txt="?"; head=`${label}: unclear`; }
-    else { head = `${label}: ${val ? val.toLowerCase() : "not scored"}`; }
-    why = humanize(reason); quote = qt || "";
-  }
-  return `<span class="qa ${cls}" data-tip-h="${esc(head)}" data-tip-w="${esc(why)}" data-tip-q="${esc(quote)}">${txt}</span>`;
+  const label = QA_TOPICS[topic], k = qaVal(r, topic), o = QA_OUT[k];
+  const q = qaRow(r);
+  let head = `${label}: ${o.head}`, why = "", quote = "";
+  if(isTransfer(r)) head = `${label}: not required (transfer)`;
+  else if(!q) head = `${label}: not scored yet`;
+  else { why = humanize(topic==="credit" ? q[1] : q[4]); quote = (topic==="credit" ? q[2] : q[5]) || ""; }
+  return `<span class="qa ${k}" data-tip-h="${esc(head)}" data-tip-w="${esc(why)}" data-tip-q="${esc(quote)}">${o.txt}</span>`;
+}
+const QA_FILTER_OPTS = [["","All"],["yes","Yes"],["no","No"],["unclear","Unclear"],["notasked","Not Asked"],["none","Not scored"]];
+function buildQaFilters(){
+  [["credit","crList","crLabel","Credit"],["home","hoList","hoLabel","Homeowner"]].forEach(([key,listId,labelId,name])=>{
+    const list = document.getElementById(listId);
+    list.innerHTML = QA_FILTER_OPTS.map(([v,n])=>`
+      <div class="pop-item${v===S[key]?" on":""}" data-v="${v}">${n}</div>`).join("");
+    list.querySelectorAll(".pop-item").forEach(el=>{
+      el.onclick = ()=>{
+        S[key] = el.dataset.v; S.page = 1;
+        list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S[key]));
+        document.getElementById(labelId).textContent =
+          `${name}: ${(QA_FILTER_OPTS.find(o=>o[0]===S[key])||QA_FILTER_OPTS[0])[1]}`;
+        closePops(); render();
+      };
+    });
+  });
 }
 function reviewTag(r){
   const q = (S.data.appt_qa||{})[r[11]];
-  if(!q || !q[6] || /transfer/i.test(String(r[2]||""))) return "";
+  if(!q || !q[6] || isTransfer(r)) return "";
   return `<span class="rv-tag" data-tip-h="Flagged for review" data-tip-w="${esc(humanize(q[7]))}" data-tip-q="">Review</span>`;
 }
 (function wireTip(){
@@ -485,7 +527,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();
