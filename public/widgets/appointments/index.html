@@ -121,6 +121,24 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
   color:#b90053;background:rgba(244,0,112,.11);vertical-align:1px;
 }
 .dup-tag.cross{color:#fff;background:var(--ll-magenta)}
+/* Call QA pills (Credit / Homeowner) — scored from the call recording */
+.qa{display:inline-block;min-width:40px;text-align:center;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:900;cursor:default}
+.qa.yes{color:#007e5c;background:rgba(0,181,128,.12)}
+.qa.no{color:#b90053;background:rgba(244,0,112,.10)}
+.qa.unk{color:#8a6d00;background:rgba(255,217,0,.18)}
+.qa.na{color:#a1a1aa;background:#f4f4f5}
+.rv-tag{
+  display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
+  font-size:.68rem;font-weight:900;color:#8a6d00;background:rgba(255,217,0,.22);vertical-align:1px;cursor:default;
+}
+.qa-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;font-size:.78rem;font-weight:750;color:var(--muted)}
+#qaTip{
+  position:fixed;z-index:100;display:none;max-width:340px;pointer-events:none;
+  background:#191718;color:#fff;border-radius:10px;padding:10px 12px;
+  font-size:.8rem;font-weight:650;line-height:1.35;box-shadow:0 12px 30px rgba(25,23,24,.25);white-space:normal;
+}
+#qaTip b{font-weight:900}
+#qaTip .q{margin-top:6px;color:#d4d4d8;font-style:italic}
 .pager{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:.82rem;font-weight:750;color:var(--muted)}
 .pager button{
   border:1px solid var(--ll-border);background:#fff;border-radius:8px;padding:6px 12px;
@@ -175,6 +193,7 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
   </div>
   <div id="content"></div>
 </div>
+<div id="qaTip"></div>
 
 <script>
 "use strict";
@@ -372,7 +391,9 @@ function tableCard(rows){
     <tr class="${d?"dup":""}">
       <td class="mono">${fmt(r[0])}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td>${esc(r[3])} ${esc(r[4])}${tag}</td>
+      <td>${esc(r[3])} ${esc(r[4])}${tag}${reviewTag(r)}</td>
+      <td>${qaPill(r,"credit")}</td>
+      <td>${qaPill(r,"home")}</td>
       <td class="mono">${esc(r[8]||"—")}</td>
       <td class="sub">${esc(r[9]||"—")}</td>
       <td class="sub">${esc(r[2])}</td>
@@ -385,10 +406,16 @@ function tableCard(rows){
     <h2 class="card-h">Every Appointment — Week of ${fmt(S.week)}</h2>
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
       dupNote(rows)}</p>
+    <div class="qa-legend">Credit &amp; Homeowner, from the call recording:
+      <span class="qa yes">Yes</span> confirmed
+      <span class="qa no">No</span> not asked or failed
+      <span class="qa unk">?</span> unclear
+      <span class="qa na">—</span> not scored or transfer
+    </div>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
-      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
-      <tbody>${body || `<tr><td colspan="7" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="9" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
     ${pages>1?`<div class="pager">
@@ -404,6 +431,55 @@ function wirePager(rows){
   if(prev) prev.onclick = ()=>{ S.page--; render(); };
   if(next) next.onclick = ()=>{ S.page++; render(); };
 }
+
+/* ---- Call QA ----
+ * S.data.appt_qa[lead_id] = [credit, credit_reason, credit_quote, homeowners,
+ *   homeowners_reason, homeowners_quote, needs_review, review_reason]
+ * Pass -> Yes; Fail / Not Asked -> No; Unclear -> ?; anything else -> —.
+ * Transfers are never scored on qualification: the dialer list doesn't always
+ * say "transfer" (an eLocal transfer can ride a HomeFix list), so the
+ * Leadspedia campaign name decides.
+ */
+const QA_TOPICS = { credit:"Credit", home:"Homeowner" };
+const humanize = s => { s = String(s||"").replace(/_/g," ").trim(); return s ? s[0].toUpperCase()+s.slice(1) : ""; };
+function qaPill(r, topic){
+  const label = QA_TOPICS[topic];
+  const q = (S.data.appt_qa||{})[r[11]];
+  let cls="na", txt="—", head=`${label}: not scored yet`, why="", quote="";
+  if(/transfer/i.test(String(r[2]||""))){
+    head = `${label}: not required (transfer)`;
+  }else if(q){
+    const [v, reason, qt] = topic==="credit" ? [q[0],q[1],q[2]] : [q[3],q[4],q[5]];
+    const val = String(v||"");
+    if(val==="Pass"){ cls="yes"; txt="Yes"; head=`${label}: confirmed on the call`; }
+    else if(val==="Fail"){ cls="no"; txt="No"; head=`${label}: failed`; }
+    else if(val==="Not Asked"){ cls="no"; txt="No"; head=`${label}: not asked on the call`; }
+    else if(val==="Unclear"){ cls="unk"; txt="?"; head=`${label}: unclear`; }
+    else { head = `${label}: ${val ? val.toLowerCase() : "not scored"}`; }
+    why = humanize(reason); quote = qt || "";
+  }
+  return `<span class="qa ${cls}" data-tip-h="${esc(head)}" data-tip-w="${esc(why)}" data-tip-q="${esc(quote)}">${txt}</span>`;
+}
+function reviewTag(r){
+  const q = (S.data.appt_qa||{})[r[11]];
+  if(!q || !q[6] || /transfer/i.test(String(r[2]||""))) return "";
+  return `<span class="rv-tag" data-tip-h="Flagged for review" data-tip-w="${esc(humanize(q[7]))}" data-tip-q="">Review</span>`;
+}
+(function wireTip(){
+  const tip = document.getElementById("qaTip");
+  document.addEventListener("mouseover", e=>{
+    const el = e.target.closest && e.target.closest("[data-tip-h]");
+    if(!el){ tip.style.display="none"; return; }
+    const h = el.dataset.tipH, w = el.dataset.tipW, q = el.dataset.tipQ;
+    tip.innerHTML = `<b>${esc(h)}</b>${w&&!/^(not asked|confirmed)$/i.test(w)?`<div>${esc(w)}</div>`:""}${q?`<div class="q">“${esc(q)}”</div>`:""}`;
+    tip.style.display = "block";
+    const b = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+    let x = Math.min(window.innerWidth - t.width - 8, Math.max(8, b.left + b.width/2 - t.width/2));
+    let y = b.top - t.height - 8; if(y < 8) y = b.bottom + 8;
+    tip.style.left = x+"px"; tip.style.top = y+"px";
+  });
+  document.addEventListener("scroll", ()=>{ tip.style.display="none"; }, true);
+})();
 
 function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));

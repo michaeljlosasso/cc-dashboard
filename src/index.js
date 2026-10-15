@@ -205,7 +205,9 @@ SELECT
   ANY_VALUE(s.state) AS state,
   ANY_VALUE(s.sold) AS sold,
   ANY_VALUE(s.phone_home) AS phone,
-  ANY_VALUE(s.email_address) AS email
+  ANY_VALUE(s.email_address) AS email,
+  CAST(NULL AS STRING) AS appt_at,
+  s.leadID AS lead_id
 FROM sold s
 LEFT JOIN agent_calls c ON c.ph = s.ph
 GROUP BY s.leadID, s.createdOn
@@ -292,10 +294,54 @@ SELECT
   FORMAT_DATETIME('%Y-%m-%d', p.createdOn) AS booked_date,
   COALESCE(u.user, p.call_user) AS agent_user,
   p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold, p.phone, p.email,
-  FORMAT_DATETIME('%Y-%m-%d %H:%M', COALESCE(p.appt_at_id, p.appt_at_phone)) AS appt_at
+  FORMAT_DATETIME('%Y-%m-%d %H:%M', COALESCE(p.appt_at_id, p.appt_at_phone)) AS appt_at,
+  p.leadID AS lead_id
 FROM picked p
 LEFT JOIN users u ON u.fn = COALESCE(p.set_by_id, p.set_by_phone)
 ORDER BY booked_date
+`;
+
+// Call QA for the Appointments table (Credit / Homeowner pills). Scores come
+// from vicidial.appointment_qa (written by the vicidial-appointment-qa Cloud
+// Run job — read-only here, never write to vicidial.*). Manny's view
+// leads.vw_appointments_qa pairs each setter-map row with its scored call.
+// Two fixes on top of the view:
+//   - the job can score the same call twice; keep the latest scored_at
+//   - Make rows carry no leadID, so map them to the Leadspedia lead by phone
+//     + nearest createdOn (Eastern -> real UTC) within 24h
+const SQL_APPT_QA = `
+WITH q AS (
+  SELECT appt_uniqueid, credit, credit_reason, credit_quote,
+         homeowners, homeowners_reason, homeowners_quote,
+         needs_review, review_reason, scored_at
+  FROM \`${PROJECT}.vicidial.appointment_qa\`
+  WHERE appt_uniqueid IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY appt_uniqueid ORDER BY scored_at DESC) = 1
+),
+v AS (
+  SELECT NULLIF(TRIM(leadID), '') AS leadID, RIGHT(REGEXP_REPLACE(IFNULL(phone,''), r'\\D', ''), 10) AS ph, set_at, appt_uniqueid
+  FROM \`${PROJECT}.leads.vw_appointments_qa\`
+  WHERE appt_uniqueid IS NOT NULL
+),
+l AS (
+  SELECT leadID, RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph,
+         TIMESTAMP(createdOn, 'America/New_York') AS ts
+  FROM \`${PROJECT}.leads.leads_get_all\`
+  WHERE affiliateID = 212 AND createdOnDate >= '2026-10-01'
+),
+lv AS (
+  SELECT v.appt_uniqueid, v.set_at,
+         COALESCE(ANY_VALUE(v.leadID),
+           ARRAY_AGG(l.leadID IGNORE NULLS ORDER BY ABS(TIMESTAMP_DIFF(l.ts, v.set_at, SECOND)) LIMIT 1)[SAFE_OFFSET(0)]) AS lead_id
+  FROM v LEFT JOIN l ON v.leadID IS NULL AND l.ph = v.ph AND ABS(TIMESTAMP_DIFF(l.ts, v.set_at, HOUR)) <= 24
+  GROUP BY v.appt_uniqueid, v.set_at, v.ph
+)
+SELECT lv.lead_id, q.credit, IFNULL(q.credit_reason,'') AS credit_reason, IFNULL(q.credit_quote,'') AS credit_quote,
+       q.homeowners, IFNULL(q.homeowners_reason,'') AS homeowners_reason, IFNULL(q.homeowners_quote,'') AS homeowners_quote,
+       IF(q.needs_review, 1, 0) AS needs_review, IFNULL(q.review_reason,'') AS review_reason
+FROM lv JOIN q USING (appt_uniqueid)
+WHERE lv.lead_id IS NOT NULL
+QUALIFY ROW_NUMBER() OVER (PARTITION BY lv.lead_id ORDER BY q.scored_at DESC) = 1
 `;
 
 // Hours = actual logged-in time: talk + wait + pause + dispo + dead seconds.
@@ -424,7 +470,7 @@ async function buildPayload(env) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -433,6 +479,7 @@ async function buildPayload(env) {
     bq(env, SQL_CONFIG).catch(() => ({ rows: [] })),
     bq(env, SQL_BREAKS).catch(() => ({ rows: [] })),
     bq(env, SQL_SPIFF_WINDOWS).catch(() => ({ rows: [] })),
+    bq(env, SQL_APPT_QA).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -446,8 +493,14 @@ async function buildPayload(env) {
     meta: { last_sync: (meta.rows[0] || [])[0] || null },
     agents: agentMap,
     // [booked_date, agent_user|null, campaign, first, last, city, state, sold,
-    //  phone, email, appt_at]  — appt_at drives the same/next-day spiff.
+    //  phone, email, appt_at, lead_id]  — appt_at drives the same/next-day spiff.
     appts: appts.rows,
+    // lead_id -> [credit, credit_reason, credit_quote, homeowners,
+    //             homeowners_reason, homeowners_quote, needs_review, review_reason]
+    // credit/homeowners: Pass | Fail | Unclear | Not Asked | Not Required | N/A
+    appt_qa: Object.fromEntries(apptQa.rows.map((r) => [r[0], [
+      r[1], r[2], r[3], r[4], r[5], r[6], Number(r[7]), r[8],
+    ]])),
     // [user, date, login_hours, calls, adjusted, logged_hours, adj_note]
     // login_hours is the PAID number (adjustments already applied); columns
     // 4-6 exist so the Hours widget can show what was really logged and why.
