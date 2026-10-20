@@ -140,6 +140,15 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
 }
 #qaTip b{font-weight:900}
 #qaTip .q{margin-top:6px;color:#d4d4d8;font-style:italic}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.export-btn{
+  display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 14px;
+  border:1px solid var(--ll-border);border-radius:999px;background:#fff;color:var(--ll-black);
+  font-family:"Nunito",sans-serif;font-size:.85rem;font-weight:850;cursor:pointer;white-space:nowrap;
+  transition:border-color 160ms ease,box-shadow 160ms ease;
+}
+.export-btn:hover{border-color:rgba(138,86,243,.62);box-shadow:0 7px 18px rgba(138,86,243,.08)}
+.export-btn:disabled{opacity:.4;cursor:default}
 .pager{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:.82rem;font-weight:750;color:var(--muted)}
 .pager button{
   border:1px solid var(--ll-border);background:#fff;border-radius:8px;padding:6px 12px;
@@ -419,10 +428,16 @@ function tableCard(rows){
   }).join("");
   const pages = Math.max(1, Math.ceil(rows.length/PAGE));
   return `<div class="card">
+    <div class="card-top"><div>
     <div class="eyebrow">Appointment Log</div>
     <h2 class="card-h">Every Appointment — Week of ${fmt(S.week)}</h2>
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
       dupNote(rows)}</p>
+    </div>
+    <button class="export-btn" id="exportBtn" ${rows.length?"":"disabled"} title="Download every row in this view (all pages) as a CSV">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Export CSV
+    </button></div>
     <div class="qa-legend">Credit &amp; Homeowner, from the call recording:
       <span class="qa yes">Yes</span>
       <span class="qa no">No</span>
@@ -444,7 +459,44 @@ function tableCard(rows){
   </div>`;
 }
 
+/* ---- Export ----
+ * Downloads exactly what the filters show (every page, not just this one),
+ * plus the QA detail behind each pill. Built in the browser from data the
+ * page already has — no new endpoint, nothing agents can't already see.
+ */
+function exportCsv(rows){
+  const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
+  const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
+  const head = ["Booked","Setter","First","Last","Credit","Homeowner","Needs Review","Phone","Email","Campaign","City","State",
+                "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
+  const lines = [head.join(",")];
+  for(const r of rows){
+    const q = isTransfer(r) ? null : qaRow(r), d = dupOf(r);
+    lines.push([
+      r[0], r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
+      label(r,"credit"), label(r,"home"), q && q[6] ? "Yes" : "",
+      r[8], r[9], r[2], r[5], r[6], r[10] || "",
+      d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",
+      q ? humanize(q[1]) : "", q ? q[2] : "", q ? humanize(q[4]) : "", q ? q[5] : "",
+      q && q[6] ? humanize(q[7]) : "", r[11] || "",
+    ].map(cell).join(","));
+  }
+  const parts = ["appointments", S.week];
+  if(S.agent) parts.push(String(S.data.agents[S.agent]||S.agent).split(" ")[0]);
+  if(S.credit) parts.push("credit-"+S.credit);
+  if(S.home) parts.push("homeowner-"+S.home);
+  if(S.dup) parts.push(S.dup==="cross" ? "cross-dupes" : "dupes");
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = parts.join("_").toLowerCase().replace(/[^a-z0-9_-]+/g,"-") + ".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
 function wirePager(rows){
+  const ex = document.getElementById("exportBtn");
+  if(ex) ex.onclick = ()=>exportCsv(rows);
   const prev = document.getElementById("pgPrev"), next = document.getElementById("pgNext");
   if(prev) prev.onclick = ()=>{ S.page--; render(); };
   if(next) next.onclick = ()=>{ S.page++; render(); };
