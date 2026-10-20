@@ -181,6 +181,16 @@ const SETTER_ALIAS_SQL = `
 // internal phone. Found Aug 22 2026: two "n a" rows on 4013013422 (Manny's own
 // number) on Aug 15 were paying Felix $10 he never earned.
 const TEST_PHONES = "('4013013422')";
+// "Convertros Call" leads are calls that rang Pella directly and were posted
+// back into Leadspedia — no setter of ours booked them, so they pay no one
+// (Manny, Oct 20 2026). They used to inherit a setter from an earlier booking
+// or dial to the same phone (e.g. Jon, Oct 12). Applied from the first unpaid
+// sets week (Oct 12) so already-paid weeks don't shift; the lead still shows
+// on the Appointments tab, just Unattributed.
+const CONVERTROS_FROM = "2026-10-12";
+const isConvertrosSql = (alias) => `(${alias}.createdOn >= DATETIME '${CONVERTROS_FROM}'
+    AND REGEXP_CONTAINS(LOWER(CONCAT(IFNULL(${alias}.first_name,''), ' ', IFNULL(${alias}.last_name,''))), r'convertros'))`;
+
 const JUNK_LEAD_SQL = `
     AND REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', '') NOT IN ${TEST_PHONES}
     AND LOWER(TRIM(CONCAT(IFNULL(first_name,''), ' ', IFNULL(last_name,''))))
@@ -212,10 +222,12 @@ agent_calls AS (
 )
 SELECT
   FORMAT_DATETIME('%Y-%m-%d', s.createdOn) AS booked_date,
+  IF(s.createdOn >= DATETIME '${CONVERTROS_FROM}'
+     AND REGEXP_CONTAINS(LOWER(CONCAT(IFNULL(ANY_VALUE(s.first_name),''), ' ', IFNULL(ANY_VALUE(s.last_name),''))), r'convertros'), NULL,
   ARRAY_AGG(c.user
     ORDER BY IF(c.status='APPTBK',0,1),
              ABS(TIMESTAMP_DIFF(c.call_date, TIMESTAMP(s.createdOn), SECOND))
-    LIMIT 1)[SAFE_OFFSET(0)] AS agent_user,
+    LIMIT 1)[SAFE_OFFSET(0)]) AS agent_user,
   ANY_VALUE(s.campaignName) AS campaign,
   ANY_VALUE(s.first_name) AS first_name,
   ANY_VALUE(s.last_name) AS last_name,
@@ -310,7 +322,7 @@ picked AS (
 )
 SELECT
   FORMAT_DATETIME('%Y-%m-%d', p.createdOn) AS booked_date,
-  COALESCE(u.user, p.call_user) AS agent_user,
+  IF(${isConvertrosSql("p")}, NULL, COALESCE(u.user, p.call_user)) AS agent_user,
   p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold, p.phone, p.email,
   FORMAT_DATETIME('%Y-%m-%d %H:%M', COALESCE(p.appt_at_id, p.appt_at_phone)) AS appt_at,
   p.leadID AS lead_id

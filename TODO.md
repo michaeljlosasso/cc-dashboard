@@ -56,6 +56,13 @@
       `hourly_rate` ($5). Jonathan (2002) = $7.50. Applies to every week ($5 was a placeholder).
       Stripped from the agent payload — admin only. Payouts table skips unattributed appts.
 
+- [x] **Convertros Call leads pay no one** (Oct 20 2026, Manny). Pella's own inbound calls posted back
+      into Leadspedia; they used to inherit a setter by phone. Forced Unattributed from CONVERTROS_FROM
+      (2026-10-12, first unpaid sets week). 4 older ones stay credited (paid weeks): Bernardo Sep 10 +
+      Sep 24, Oscar Sep 11, Andres Oct 9. Verified vs Manny's Oct 12–18 export: setters now match 86/86.
+- [ ] Open (Manny to decide): unsold/trashed eLocal transfers still pay the $5 set (DelRossi/Felix,
+      B. Williams/Bernardo, Oct 16); trashed "Not Match" appt Paul Cail/Jon Oct 13.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
