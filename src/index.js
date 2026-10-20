@@ -536,7 +536,12 @@ async function buildPayload(env, admin) {
   for (const [user, name] of agents.rows) agentMap[user] = name;
 
   const configMap = {};
-  for (const [k, v] of config.rows) configMap[k] = Number(v);
+  for (const [k, v] of config.rows) {
+    // Per-agent hourly rates (hourly_rate_<user>) are admin-only: agents must
+    // not be able to see each other's pay in the payload.
+    if (!admin && /^hourly_rate_/.test(k)) continue;
+    configMap[k] = Number(v);
+  }
 
   return {
     generated_at: new Date().toISOString(),
@@ -634,7 +639,7 @@ async function handleAdmin(request, env, url, adminSess) {
     const weekEnd = end.toISOString().slice(0, 10);
 
     const [payload, sameNext] = await Promise.all([
-      buildPayload(env),
+      buildPayload(env, true),
       bq(env, SQL_SAME_NEXT).catch(() => ({ rows: [] })),
     ]);
 
@@ -645,6 +650,18 @@ async function handleAdmin(request, env, url, adminSess) {
       demo: Number(cfg.demo_bonus ?? 5),
       hourly: Number(cfg.hourly_rate ?? 0),
     };
+    // Per-agent hourly override: cc_config key hourly_rate_<user> (e.g.
+    // hourly_rate_2002 = 7.5 for Jonathan, Oct 20 2026). Everyone else gets
+    // the flat hourly_rate. The $5 was a placeholder until then, so this
+    // applies to every week, not from a date.
+    const hourlyFor = (u) => {
+      const v = cfg[`hourly_rate_${u}`];
+      return v === undefined || v === null || isNaN(Number(v)) ? rate.hourly : Number(v);
+    };
+    const hourlyOverrides = {};
+    for (const u of Object.keys(payload.agents)) {
+      if (hourlyFor(u) !== rate.hourly) hourlyOverrides[u] = hourlyFor(u);
+    }
 
     // name -> user, so setter-map rows (keyed by name) can join the agent list.
     const byName = {};
@@ -684,13 +701,14 @@ async function handleAdmin(request, env, url, adminSess) {
       const sn = r.same_day + r.next_day;
       const appt_pay = r.appts * rate.appt;
       const sn_pay = sn * rate.same_next;
-      const hourly_pay = Math.round(r.hours * rate.hourly * 100) / 100;
+      const hourly_rate = hourlyFor(r.user);
+      const hourly_pay = Math.round(r.hours * hourly_rate * 100) / 100;
       const payout = appt_pay + sn_pay + r.spiffs;
       return {
         ...r,
         hours: Math.round(r.hours * 100) / 100,
         same_next: sn,
-        appt_pay, sn_pay, hourly_pay,
+        appt_pay, sn_pay, hourly_rate, hourly_pay,
         payout,                                  // Friday: appointment side only
         total_cost: Math.round((payout + hourly_pay) * 100) / 100,
         cost_per_appt: r.appts
@@ -700,7 +718,7 @@ async function handleAdmin(request, env, url, adminSess) {
     }).sort((a, b) => b.payout - a.payout);
 
     return new Response(JSON.stringify({
-      week, week_end: weekEnd, rates: rate, agents,
+      week, week_end: weekEnd, rates: { ...rate, hourly_overrides: hourlyOverrides }, agents,
       // Straight talk for the UI: how much of the week can actually be judged.
       coverage: {
         dated: agents.reduce((s, a) => s + a.dated, 0),

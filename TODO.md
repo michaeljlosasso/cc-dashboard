@@ -52,6 +52,10 @@
       call to the phone 24h before the lead posted. Agrees with the QA job's text-vs-call scoring
       234/241. Manny feeds Jonathan the SMS; agents must not see this.
 
+- [x] **Per-agent hourly rate** (Oct 20 2026): cc_config `hourly_rate_<user>` overrides the flat
+      `hourly_rate` ($5). Jonathan (2002) = $7.50. Applies to every week ($5 was a placeholder).
+      Stripped from the agent payload — admin only. Payouts table skips unattributed appts.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
