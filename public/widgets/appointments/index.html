@@ -127,9 +127,10 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
 .qa.no{color:#b90053;background:rgba(244,0,112,.10)}
 .qa.unclear{color:#8a6d00;background:rgba(255,217,0,.20)}
 .qa.notasked{color:#5b3fb0;background:rgba(138,86,243,.12)}
-/* Territory: Yes is the default (quiet), No stands out. Admin clicks to flip. */
-.terr{display:inline-block;border:0;border-radius:999px;padding:3px 9px;font-family:"Nunito",sans-serif;font-size:.72rem;font-weight:900;cursor:default}
-.terr.in{color:#3f6b5c;background:#eef5f2}
+/* Territory: Yes is the default, No stands out. Admin clicks to flip. */
+.terr{display:inline-block;min-width:40px;text-align:center;border:0;border-radius:999px;padding:3px 9px;font-family:"Nunito",sans-serif;font-size:.72rem;font-weight:900;cursor:default}
+/* same colors as the Credit / Homeowner Yes and No pills */
+.terr.in{color:#007e5c;background:rgba(0,181,128,.12)}
 .terr.out{color:#b90053;background:rgba(244,0,112,.10)}
 button.terr{cursor:pointer}
 button.terr:hover{box-shadow:0 0 0 2px rgba(138,86,243,.35)}
