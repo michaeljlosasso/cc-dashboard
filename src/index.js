@@ -405,6 +405,15 @@ GROUP BY l.leadID
 HAVING COUNT(c.ph) = 0
 `;
 
+// Manny's manual QA corrections (pencil on the Appointments tab, admin only).
+// Our own table — never written into vicidial.appointment_qa, which the
+// scoring job rewrites. One row per lead+topic; an edit always wins.
+const SQL_QA_OVERRIDE = `
+SELECT lead_id, topic, value, IFNULL(note,'') AS note
+FROM \`${PROJECT}.leads.cc_qa_override\`
+`;
+const QA_VALUES = ["Pass", "Fail", "Unclear", "Not Asked"];
+
 // Hours = actual logged-in time: talk + wait + pause + dispo + dead seconds.
 // Paused breaks (LUNCH/BRK/ADMIN) count; logged-out time does not. Capped at
 // the day's first-to-last span so overlapping timers can't overpay.
@@ -531,7 +540,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -542,6 +551,7 @@ async function buildPayload(env, admin) {
     bq(env, SQL_SPIFF_WINDOWS).catch(() => ({ rows: [] })),
     bq(env, SQL_APPT_QA).catch(() => ({ rows: [] })),
     admin ? bq(env, SQL_APPT_SMS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    bq(env, SQL_QA_OVERRIDE).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -583,6 +593,16 @@ async function buildPayload(env, admin) {
     spiff_windows: windows.rows.map((r) => [r[0], r[1], r[2], r[3], Number(r[4]), r[5]]),
     // {set_bonus, sit_bonus, sit_rate, close_rate, avg_project, rev_share, hourly_rate}
     config: configMap,
+    // lead_id -> {credit?: value, home?: value}. Manny's corrections; everyone
+    // sees the corrected pill. The note is admin-only (qa_edit_note).
+    qa_edit: qaOverride.rows.reduce((m, [id, topic, value]) => {
+      if (topic === "credit" || topic === "home") (m[id] = m[id] || {})[topic] = value;
+      return m;
+    }, {}),
+    ...(admin ? { qa_edit_note: qaOverride.rows.reduce((m, [id, topic, , note]) => {
+      if (note) (m[id] = m[id] || {})[topic] = note;
+      return m;
+    }, {}) } : {}),
     admin: !!admin,
     // ADMIN ONLY — never in the agent payload. Lead IDs that look texted.
     ...(admin ? { appt_sms: apptSms.rows.map((r) => r[0]) } : {}),
@@ -810,6 +830,35 @@ async function handleAdmin(request, env, url, adminSess) {
     return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
   }
 
+  /* QA correction. value = Pass|Fail|Unclear|Not Asked sets it; empty value
+   * removes the edit so the scorer's answer shows again. */
+  if (url.pathname === "/api/qa-override") {
+    const id = String(body.lead_id || "");
+    const topic = String(body.topic || "");
+    const value = String(body.value || "");
+    if (!/^[A-Za-z0-9]{6,16}$/.test(id)) throw new Error("bad lead id");
+    if (topic !== "credit" && topic !== "home") throw new Error("bad topic");
+    if (value && !QA_VALUES.includes(value)) throw new Error("bad value");
+    if (!value) {
+      await bq(env, `
+        DELETE FROM \`${PROJECT}.leads.cc_qa_override\`
+        WHERE lead_id = '${id}' AND topic = '${topic}'
+      `);
+    } else {
+      await bq(env, `
+        MERGE \`${PROJECT}.leads.cc_qa_override\` t
+        USING (SELECT '${id}' AS lead_id, '${topic}' AS topic) s
+          ON t.lead_id = s.lead_id AND t.topic = s.topic
+        WHEN MATCHED THEN UPDATE SET
+          value = '${value}', note = ${sqlStr(body.note || "", 300)}, updated_at = CURRENT_TIMESTAMP()
+        WHEN NOT MATCHED THEN INSERT (lead_id, topic, value, note, updated_at)
+          VALUES (s.lead_id, s.topic, '${value}', ${sqlStr(body.note || "", 300)}, CURRENT_TIMESTAMP())
+      `);
+    }
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
   if (url.pathname === "/api/hours-adjust/delete") {
     const user = String(body.user || "");
     const date = String(body.work_date || "");
@@ -977,6 +1026,7 @@ export default {
     if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config"
          || path === "/api/spiff-window" || path === "/api/spiff-window/delete"
          || path === "/api/hours-adjust" || path === "/api/hours-adjust/delete"
+         || path === "/api/qa-override"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });

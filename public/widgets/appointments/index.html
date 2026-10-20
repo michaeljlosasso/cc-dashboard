@@ -136,6 +136,32 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
   font-size:.68rem;font-weight:900;color:#8a6d00;background:rgba(255,217,0,.22);vertical-align:1px;cursor:default;
 }
 .qa-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;font-size:.78rem;font-weight:750;color:var(--muted)}
+/* admin QA edit */
+.qa-cell{display:inline-flex;align-items:center;gap:4px}
+.qa.edited::after{content:"✎";margin-left:4px;font-size:.7rem;opacity:.75}
+.qa-pen{
+  border:0;background:transparent;cursor:pointer;padding:2px 4px;border-radius:6px;
+  color:#a1a1aa;opacity:.3;transition:opacity 120ms ease,color 120ms ease;line-height:1;
+}
+tbody tr:hover .qa-pen{opacity:1}
+.qa-pen:hover{color:#8a56f3;background:#f4f4f5}
+#qaMenu{
+  position:fixed;z-index:110;display:none;width:240px;background:#fff;border:1px solid var(--ll-border);
+  border-radius:12px;box-shadow:0 22px 54px rgba(25,23,24,.16),0 2px 8px rgba(25,23,24,.08);padding:10px;
+}
+#qaMenu .mh{font-size:.72rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:2px 4px 8px}
+#qaMenu input{
+  width:100%;border:1px solid var(--ll-border);border-radius:8px;padding:7px 9px;margin-bottom:8px;
+  font-family:"Nunito",sans-serif;font-size:.82rem;font-weight:700;
+}
+#qaMenu .opts{display:flex;flex-wrap:wrap;gap:6px}
+#qaMenu .opts button{border:0;cursor:pointer;font-family:"Nunito",sans-serif}
+#qaMenu .reset{
+  display:block;width:100%;margin-top:8px;border:1px solid var(--ll-border);background:#fff;border-radius:8px;
+  padding:6px;font-family:"Nunito",sans-serif;font-size:.78rem;font-weight:800;color:var(--muted);cursor:pointer;
+}
+#qaMenu .msg{font-size:.78rem;font-weight:800;margin-top:8px;color:var(--muted)}
+#qaMenu .msg.err{color:#b90053}
 #qaTip{
   position:fixed;z-index:100;display:none;max-width:340px;pointer-events:none;
   background:#191718;color:#fff;border-radius:10px;padding:10px 12px;
@@ -228,6 +254,7 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
   <div id="content"></div>
 </div>
 <div id="qaTip"></div>
+<div id="qaMenu"></div>
 
 <script>
 "use strict";
@@ -535,7 +562,12 @@ const QA_OUT = {
 const QA_MAP = { "Pass":"yes", "Fail":"no", "Unclear":"unclear", "Not Asked":"notasked" };
 const isTransfer = r => /transfer/i.test(String(r[2]||""));
 const qaRow = r => (S.data.appt_qa||{})[r[11]] || null;
+// Manny's correction for this lead/topic, if any ("Pass" | "Fail" | ...).
+const qaEdit = (r, topic) => ((S.data.qa_edit||{})[r[11]]||{})[topic] || "";
+const qaEditNote = (r, topic) => ((S.data.qa_edit_note||{})[r[11]]||{})[topic] || "";
 function qaVal(r, topic){
+  const e = qaEdit(r, topic);
+  if(e) return QA_MAP[e] || "none";       // an edit always wins, transfers included
   if(isTransfer(r)) return "none";
   const q = qaRow(r); if(!q) return "none";
   return QA_MAP[String((topic==="credit" ? q[0] : q[3]) || "")] || "none";
@@ -544,11 +576,21 @@ const humanize = s => { s = String(s||"").replace(/_/g," ").trim(); return s ? s
 function qaPill(r, topic){
   const label = QA_TOPICS[topic], k = qaVal(r, topic), o = QA_OUT[k];
   const q = qaRow(r);
+  const edit = qaEdit(r, topic);
   let head = `${label}: ${o.head}`, why = "", quote = "";
-  if(isTransfer(r)) head = `${label}: not required (transfer)`;
+  if(edit){
+    const orig = q && !isTransfer(r) ? (topic==="credit" ? q[0] : q[3]) : "";
+    head = `${label}: ${o.txt} — corrected by Manny`;
+    const nice = v => ({ Pass:"Yes", Fail:"No" })[v] || v;
+    why = [qaEditNote(r, topic), orig ? `Scorer said: ${nice(orig)}` : ""].filter(Boolean).join(" · ");
+    if(q && !isTransfer(r)) quote = (topic==="credit" ? q[2] : q[5]) || "";
+  }
+  else if(isTransfer(r)) head = `${label}: not required (transfer)`;
   else if(!q) head = `${label}: not scored yet`;
   else { why = humanize(topic==="credit" ? q[1] : q[4]); quote = (topic==="credit" ? q[2] : q[5]) || ""; }
-  return `<span class="qa ${k}" data-tip-h="${esc(head)}" data-tip-w="${esc(why)}" data-tip-q="${esc(quote)}">${o.txt}</span>`;
+  const pill = `<span class="qa ${k}${edit?" edited":""}" data-tip-h="${esc(head)}" data-tip-w="${esc(why)}" data-tip-q="${esc(quote)}">${o.txt}</span>`;
+  if(!isAdmin() || !r[11]) return pill;
+  return `<span class="qa-cell">${pill}<button class="qa-pen" title="Correct this" data-lead="${esc(r[11])}" data-topic="${topic}">✎</button></span>`;
 }
 const QA_FILTER_OPTS = [["","All"],["yes","Yes"],["no","No"],["unclear","Unclear"],["notasked","Not Asked"],["none","Not scored"]];
 function buildQaFilters(){
@@ -614,6 +656,70 @@ function reviewTag(r){
   });
   document.addEventListener("scroll", ()=>{ tip.style.display="none"; }, true);
 })();
+
+/* ---- Admin: correct a QA pill ----
+ * Saves to leads.cc_qa_override through /api/qa-override (server checks the
+ * admin login). Our own table, so the scoring job can't overwrite it.
+ */
+const QA_EDIT_OPTS = [["Pass","yes"],["Fail","no"],["Unclear","unclear"],["Not Asked","notasked"]];
+const MENU = { lead:"", topic:"", busy:false };
+function openQaMenu(btn){
+  const menu = document.getElementById("qaMenu");
+  MENU.lead = btn.dataset.lead; MENU.topic = btn.dataset.topic; MENU.busy = false;
+  const cur = ((S.data.qa_edit||{})[MENU.lead]||{})[MENU.topic] || "";
+  const note = ((S.data.qa_edit_note||{})[MENU.lead]||{})[MENU.topic] || "";
+  menu.innerHTML = `
+    <div class="mh">Set ${QA_TOPICS[MENU.topic]}</div>
+    <input id="qaNote" maxlength="300" placeholder="Note (optional), e.g. said 506" value="${esc(note)}">
+    <div class="opts">${QA_EDIT_OPTS.map(([v,k])=>
+      `<button class="qa ${k}" data-v="${v}">${QA_OUT[k].txt}${cur===v?" ✓":""}</button>`).join("")}</div>
+    ${cur ? `<button class="reset" data-v="">Undo my correction (back to scorer)</button>` : ""}
+    <div class="msg" id="qaMsg"></div>`;
+  menu.style.display = "block";
+  const b = btn.getBoundingClientRect(), m = menu.getBoundingClientRect();
+  menu.style.left = Math.min(window.innerWidth - m.width - 8, Math.max(8, b.left - 8)) + "px";
+  let y = b.bottom + 6; if(y + m.height > window.innerHeight - 8) y = Math.max(8, b.top - m.height - 6);
+  menu.style.top = y + "px";
+  menu.querySelectorAll("button[data-v]").forEach(x => x.onclick = (e)=>{ e.stopPropagation(); saveQa(x.dataset.v); });
+  document.getElementById("qaNote").focus();
+}
+function closeQaMenu(){ const m = document.getElementById("qaMenu"); if(m) m.style.display = "none"; }
+async function saveQa(value){
+  if(MENU.busy) return;
+  MENU.busy = true;
+  const msg = document.getElementById("qaMsg");
+  const note = (document.getElementById("qaNote")||{}).value || "";
+  msg.className = "msg"; msg.textContent = "Saving…";
+  try{
+    const r = await fetch("/api/qa-override", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ admin:"session", lead_id:MENU.lead, topic:MENU.topic, value, note: value ? note : "" }),
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    // Mirror the saved state locally so the table updates without a reload.
+    S.data.qa_edit = S.data.qa_edit || {}; S.data.qa_edit_note = S.data.qa_edit_note || {};
+    const e = S.data.qa_edit[MENU.lead] = S.data.qa_edit[MENU.lead] || {};
+    const n = S.data.qa_edit_note[MENU.lead] = S.data.qa_edit_note[MENU.lead] || {};
+    if(value){ e[MENU.topic] = value; if(note) n[MENU.topic] = note; else delete n[MENU.topic]; }
+    else { delete e[MENU.topic]; delete n[MENU.topic]; }
+    closeQaMenu(); render();
+  }catch(err){
+    MENU.busy = false;
+    msg.className = "msg err"; msg.textContent = "Didn't save: " + String(err.message||err);
+  }
+}
+document.addEventListener("click", (e)=>{
+  const pen = e.target.closest && e.target.closest(".qa-pen");
+  if(pen){ e.stopPropagation(); closePops(); openQaMenu(pen); return; }
+  if(e.target.closest && e.target.closest("#qaMenu")) return;
+  closeQaMenu();
+}, true);
+document.addEventListener("keydown", (e)=>{
+  if(e.key==="Escape") closeQaMenu();
+  if(e.key==="Enter" && e.target && e.target.id==="qaNote") e.preventDefault();
+});
+document.addEventListener("scroll", (e)=>{ if(!(e.target.closest && e.target.closest("#qaMenu"))) closeQaMenu(); }, true);
 
 function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));

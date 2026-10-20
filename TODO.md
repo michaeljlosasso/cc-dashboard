@@ -63,6 +63,11 @@
 - [ ] Open (Manny to decide): unsold/trashed eLocal transfers still pay the $5 set (DelRossi/Felix,
       B. Williams/Bernardo, Oct 16); trashed "Not Match" appt Paul Cail/Jon Oct 13.
 
+- [x] **Admin QA corrections** (Oct 20 2026). Pencil next to each Credit/Homeowner pill (admin only) →
+      Yes/No/Unclear/Not Asked + optional note, or undo. Saved to `leads.cc_qa_override` (lead_id+topic,
+      MERGE) via /api/qa-override; never touches vicidial.appointment_qa. Edit wins everywhere (pill,
+      filters, export); everyone sees the corrected pill, note is admin-only. Hover shows scorer's original.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
