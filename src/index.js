@@ -434,6 +434,14 @@ FROM \`${PROJECT}.leads.cc_qa_override\`
 `;
 const QA_VALUES = ["Pass", "Fail", "Unclear", "Not Asked"];
 
+// Territory (Manny, Oct 20 2026): every appointment is in territory unless he
+// flags it out from the admin view. Display only — never changes pay.
+const SQL_TERRITORY = `
+SELECT lead_id, IFNULL(note,'') AS note
+FROM \`${PROJECT}.leads.cc_territory_override\`
+WHERE NOT in_territory
+`;
+
 // Hours = actual logged-in time: talk + wait + pause + dispo + dead seconds.
 // Paused breaks (LUNCH/BRK/ADMIN) count; logged-out time does not. Capped at
 // the day's first-to-last span so overlapping timers can't overpay.
@@ -561,7 +569,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -574,6 +582,7 @@ async function buildPayload(env, admin) {
     admin ? bq(env, SQL_APPT_SMS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
     bq(env, SQL_QA_OVERRIDE).catch(() => ({ rows: [] })),
     admin ? bq(env, SQL_SPIFF_TYPES).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    bq(env, SQL_TERRITORY).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -629,6 +638,9 @@ async function buildPayload(env, admin) {
       if (note) (m[id] = m[id] || {})[topic] = note;
       return m;
     }, {}) } : {}),
+    // Lead IDs flagged out of territory (everyone sees the flag; note is admin-only).
+    out_territory: territory.rows.map((r) => r[0]),
+    ...(admin ? { out_territory_note: Object.fromEntries(territory.rows.filter((r) => r[1]).map((r) => [r[0], r[1]])) } : {}),
     admin: !!admin,
     // ADMIN ONLY — never in the agent payload. Lead IDs that look texted.
     ...(admin ? { appt_sms: apptSms.rows.map((r) => r[0]) } : {}),
@@ -911,6 +923,27 @@ async function handleAdmin(request, env, url, adminSess) {
     return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
   }
 
+  /* Territory flag. in_territory=false marks it out; true removes the flag
+   * (in territory is the default, so it's not stored). */
+  if (url.pathname === "/api/territory") {
+    const id = String(body.lead_id || "");
+    if (!/^[A-Za-z0-9]{6,16}$/.test(id)) throw new Error("bad lead id");
+    if (typeof body.in_territory !== "boolean") throw new Error("in_territory must be true or false");
+    if (body.in_territory) {
+      await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_territory_override\` WHERE lead_id = '${id}'`);
+    } else {
+      await bq(env, `
+        MERGE \`${PROJECT}.leads.cc_territory_override\` t
+        USING (SELECT '${id}' AS lead_id) s ON t.lead_id = s.lead_id
+        WHEN MATCHED THEN UPDATE SET in_territory = FALSE, note = ${sqlStr(body.note || "", 300)}, updated_at = CURRENT_TIMESTAMP()
+        WHEN NOT MATCHED THEN INSERT (lead_id, in_territory, note, updated_at)
+          VALUES (s.lead_id, FALSE, ${sqlStr(body.note || "", 300)}, CURRENT_TIMESTAMP())
+      `);
+    }
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
   if (url.pathname === "/api/hours-adjust/delete") {
     const user = String(body.user || "");
     const date = String(body.work_date || "");
@@ -1078,7 +1111,7 @@ export default {
     if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config"
          || path === "/api/spiff-window" || path === "/api/spiff-window/delete"
          || path === "/api/hours-adjust" || path === "/api/hours-adjust/delete"
-         || path === "/api/qa-override"
+         || path === "/api/qa-override" || path === "/api/territory"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });

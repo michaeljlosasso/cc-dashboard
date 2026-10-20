@@ -90,6 +90,10 @@
       Saved spiff `qa-spiff-1`. Scorer rubric v4 so pill = pay. Open: SMS booking flow must ask both
       questions or SMS bookings (mostly Jon's) score Not Asked.
 
+- [x] **Territory column** (Oct 20 2026) on Appointments: Yes by default; admin clicks the pill to flip
+      to No (`leads.cc_territory_override`, only "out" rows stored; /api/territory). Everyone sees it,
+      filter + export included. Display only — no effect on pay (Manny).
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

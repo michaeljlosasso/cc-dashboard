@@ -127,6 +127,13 @@ tbody tr.dup:hover{background:rgba(244,0,112,.09)}
 .qa.no{color:#b90053;background:rgba(244,0,112,.10)}
 .qa.unclear{color:#8a6d00;background:rgba(255,217,0,.20)}
 .qa.notasked{color:#5b3fb0;background:rgba(138,86,243,.12)}
+/* Territory: Yes is the default (quiet), No stands out. Admin clicks to flip. */
+.terr{display:inline-block;border:0;border-radius:999px;padding:3px 9px;font-family:"Nunito",sans-serif;font-size:.72rem;font-weight:900;cursor:default}
+.terr.in{color:#3f6b5c;background:#eef5f2}
+.terr.out{color:#b90053;background:rgba(244,0,112,.10)}
+button.terr{cursor:pointer}
+button.terr:hover{box-shadow:0 0 0 2px rgba(138,86,243,.35)}
+button.terr:disabled{opacity:.5;cursor:wait}
 .ch{display:inline-block;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:900}
 .ch.call{color:#0077a3;background:rgba(0,197,255,.12)}
 .ch.sms{color:#b90053;background:rgba(244,0,112,.10)}
@@ -242,6 +249,13 @@ tbody tr:hover .qa-pen{opacity:1}
       </button>
       <div class="pop" id="hoPop"><div class="pop-list" id="hoList"></div></div>
     </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="trBtn" aria-expanded="false">
+        <span id="trLabel">Territory: All</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="trPop"><div class="pop-list" id="trList"></div></div>
+    </div>
     <div class="pop-wrap" id="chWrap" style="display:none">
       <button class="filter-control" id="chBtn" aria-expanded="false">
         <span id="chLabel">Channel: All</span>
@@ -261,7 +275,7 @@ tbody tr:hover .qa-pen{opacity:1}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -296,7 +310,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel();
+    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -381,6 +395,7 @@ function filtered(){
     if(S.credit && qaVal(r,"credit") !== S.credit) return false;
     if(S.home && qaVal(r,"home") !== S.home) return false;
     if(S.ch && channel(r) !== S.ch) return false;
+    if(S.terr && (inTerritory(r) ? "yes" : "no") !== S.terr) return false;
     return true;
   }).sort((x,y)=> y[0] < x[0] ? -1 : y[0] > x[0] ? 1 : 0);
 }
@@ -457,7 +472,8 @@ function tableCard(rows){
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td>${esc(r[3])} ${esc(r[4])}${tag}${reviewTag(r)}</td>
       <td>${qaPill(r,"credit")}</td>
-      <td>${qaPill(r,"home")}</td>${isAdmin()?`
+      <td>${qaPill(r,"home")}</td>
+      <td>${terrCell(r)}</td>${isAdmin()?`
       <td>${chPill(r)}</td>`:""}
       <td class="mono">${esc(r[8]||"—")}</td>
       <td class="sub">${esc(r[9]||"—")}</td>
@@ -486,8 +502,8 @@ function tableCard(rows){
     </div>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
-      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
-      <tbody>${body || `<tr><td colspan="${isAdmin()?10:9}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Territory</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="${isAdmin()?11:10}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
     ${pages>1?`<div class="pager">
@@ -506,14 +522,14 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Booked","Setter","First","Last","Credit","Homeowner",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Booked","Setter","First","Last","Credit","Homeowner","In Territory",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
     const q = isTransfer(r) ? null : qaRow(r), d = dupOf(r);
     lines.push([
       r[0], r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
-      label(r,"credit"), label(r,"home"), ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
+      label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
       d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",
       q ? humanize(q[1]) : "", q ? q[2] : "", q ? humanize(q[4]) : "", q ? q[5] : "",
@@ -526,6 +542,7 @@ function exportCsv(rows){
   if(S.home) parts.push("homeowner-"+S.home);
   if(S.dup) parts.push(S.dup==="cross" ? "cross-dupes" : "dupes");
   if(S.ch) parts.push(S.ch);
+  if(S.terr) parts.push("territory-" + S.terr);
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -636,6 +653,57 @@ function buildChannel(){
 }
 const chPill = r => channel(r)==="sms" ? '<span class="ch sms">SMS</span>' : '<span class="ch call">Call</span>';
 
+/* ---- Territory ----
+ * Every appointment is in territory unless Manny flags it out (admin view,
+ * click the pill). Everyone sees it; only the admin login can change it.
+ * Display only — it doesn't change pay.
+ */
+let OUT = new Set();
+const inTerritory = r => !OUT.has(r[11]);
+const TR_OPTS = [["","All"],["yes","Yes"],["no","No"]];
+function buildTerritory(){
+  OUT = new Set(S.data.out_territory || []);
+  const list = document.getElementById("trList");
+  list.innerHTML = TR_OPTS.map(([v,n])=>`<div class="pop-item${v===S.terr?" on":""}" data-v="${v}">${n}</div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.terr = el.dataset.v; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.terr));
+      document.getElementById("trLabel").textContent = `Territory: ${(TR_OPTS.find(o=>o[0]===S.terr)||TR_OPTS[0])[1]}`;
+      closePops(); render();
+    };
+  });
+}
+function terrCell(r){
+  if(!r[11]) return '<span class="sub">—</span>';
+  const yes = inTerritory(r), cls = yes ? "in" : "out", txt = yes ? "Yes" : "No";
+  if(!isAdmin()) return `<span class="terr ${cls}">${txt}</span>`;
+  return `<button class="terr ${cls}" data-terr="${esc(r[11])}" title="${yes ? "Click to mark out of territory" : "Click to mark in territory"}">${txt}</button>`;
+}
+async function toggleTerritory(btn){
+  const lead = btn.dataset.terr, nowIn = !OUT.has(lead);
+  btn.disabled = true;
+  try{
+    const r = await fetch("/api/territory", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ admin:"session", lead_id: lead, in_territory: !nowIn }),
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    if(nowIn) OUT.add(lead); else OUT.delete(lead);
+    S.data.out_territory = [...OUT];
+    render();
+  }catch(err){
+    btn.disabled = false;
+    btn.title = "Didn't save: " + String(err.message||err);
+    btn.textContent = "Retry";
+  }
+}
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest && e.target.closest("button.terr[data-terr]");
+  if(b && !b.disabled){ e.stopPropagation(); toggleTerritory(b); }
+}, true);
+
 function reviewTag(r){
   const q = (S.data.appt_qa||{})[r[11]];
   if(!q || !q[6] || isTransfer(r)) return "";
@@ -725,7 +793,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();
