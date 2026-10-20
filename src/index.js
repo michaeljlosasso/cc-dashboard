@@ -529,10 +529,22 @@ SELECT key, value FROM \`${PROJECT}.leads.cc_config\`
 // covers it. Managed from the Spiffs sub-widget.
 const SQL_SPIFF_WINDOWS = `
 SELECT id, kind, FORMAT_DATE('%Y-%m-%d', start_date) AS s,
-       FORMAT_DATE('%Y-%m-%d', end_date) AS e, rate, IFNULL(note,'') AS note
+       FORMAT_DATE('%Y-%m-%d', end_date) AS e, rate, IFNULL(note,'') AS note,
+       threshold, IFNULL(type_id,'') AS type_id
 FROM \`${PROJECT}.leads.cc_spiff_windows\`
 ORDER BY start_date DESC
 `;
+
+// The A-list: saved spiffs Manny can turn on for any week (admin only).
+// kind must be one of SPIFF_KINDS — rules public/widgets/shared/spiff-rules.js
+// knows how to pay.
+const SQL_SPIFF_TYPES = `
+SELECT id, name, kind, rate, threshold, IFNULL(note,'') AS note
+FROM \`${PROJECT}.leads.cc_spiff_types\`
+WHERE NOT IFNULL(archived, FALSE)
+ORDER BY sort, name
+`;
+const SPIFF_KINDS = ["same_next", "team_goal"];
 
 // Same/next-day bonus counts. Only rows carrying appointment_at can be judged —
 // that field started flowing from Make on Aug 22 2026, so earlier weeks report
@@ -556,7 +568,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -568,6 +580,7 @@ async function buildPayload(env, admin) {
     bq(env, SQL_APPT_QA).catch(() => ({ rows: [] })),
     admin ? bq(env, SQL_APPT_SMS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
     bq(env, SQL_QA_OVERRIDE).catch(() => ({ rows: [] })),
+    admin ? bq(env, SQL_SPIFF_TYPES).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
   ]);
 
   const agentMap = {};
@@ -605,8 +618,12 @@ async function buildPayload(env, admin) {
     spiffs: spiffs.rows.map((r) => [r[0], r[1], Number(r[2]), r[3], r[4]]),
     // [user, date, code, hours]
     breaks: breaks.rows.map((r) => [r[0], r[1], r[2], Number(r[3])]),
-    // [id, kind, start_date, end_date, rate, note]
-    spiff_windows: windows.rows.map((r) => [r[0], r[1], r[2], r[3], Number(r[4]), r[5]]),
+    // [id, kind, start_date, end_date, rate, note, threshold|null, type_id]
+    spiff_windows: windows.rows.map((r) => [r[0], r[1], r[2], r[3], Number(r[4]), r[5],
+      r[6] === null || r[6] === undefined ? null : Number(r[6]), r[7] || ""]),
+    // ADMIN ONLY. Saved spiffs: [id, name, kind, rate, threshold|null, note]
+    ...(admin ? { spiff_types: spiffTypes.rows.map((r) => [r[0], r[1], r[2], Number(r[3]),
+      r[4] === null || r[4] === undefined ? null : Number(r[4]), r[5]]) } : {}),
     // {set_bonus, sit_bonus, sit_rate, close_rate, avg_project, rev_share, hourly_rate}
     config: configMap,
     // lead_id -> {credit?: value, home?: value}. Manny's corrections; everyone
@@ -795,16 +812,34 @@ async function handleAdmin(request, env, url, adminSess) {
     const kind = String(body.kind || "");
     const start = String(body.start_date || ""), end = String(body.end_date || "");
     const rate = Number(body.rate);
-    if (!/^[a-z_]{1,32}$/.test(kind)) throw new Error("bad kind");
+    const typeId = String(body.type_id || "");
+    if (!SPIFF_KINDS.includes(kind)) throw new Error("unknown spiff kind");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error("bad dates");
     if (end < start) throw new Error("end before start");
     if (!Number.isFinite(rate) || rate < 0 || rate > 1000) throw new Error("bad rate");
+    if (typeId && !/^[a-z0-9-]{1,40}$/.test(typeId)) throw new Error("bad saved spiff");
+    let threshold = "NULL";
+    if (kind === "team_goal") {
+      const t = Number(body.threshold);
+      if (!Number.isInteger(t) || t < 1 || t > 10000) throw new Error("team goal needs a whole number of appointments");
+      threshold = String(t);
+    }
+    // One programmatic spiff per week: overlapping windows would make the
+    // Commission tab pick one arbitrarily. Turn the old one off first.
+    const clash = await bq(env, `
+      SELECT COUNT(*) FROM \`${PROJECT}.leads.cc_spiff_windows\`
+      WHERE start_date <= DATE '${end}' AND end_date >= DATE '${start}'
+    `);
+    if (Number((clash.rows[0] || [0])[0]) > 0) {
+      throw new Error("a spiff is already on for those dates — turn it off first");
+    }
     const id = crypto.randomUUID();
     await bq(env, `
       INSERT INTO \`${PROJECT}.leads.cc_spiff_windows\`
-        (id, kind, start_date, end_date, rate, note, created_at)
+        (id, kind, start_date, end_date, rate, note, threshold, type_id, created_at)
       VALUES ('${id}', '${kind}', DATE '${start}', DATE '${end}', ${rate},
-              ${sqlStr(body.note || "", 200)}, CURRENT_TIMESTAMP())
+              ${sqlStr(body.note || "", 200)}, ${threshold}, ${typeId ? `'${typeId}'` : "NULL"},
+              CURRENT_TIMESTAMP())
     `);
     await bustDataCache(url);
     return new Response(JSON.stringify({ ok: true, id }), { headers: JSON_HEADERS });

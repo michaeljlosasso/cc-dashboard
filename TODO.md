@@ -73,6 +73,15 @@
       vicidial-appointment-qa:v3-*, reference copy + rollback in qa-job/. 52 Unclear-credit rows
       (last 14 days) backed up to leads.appointment_qa_backup_20261020 and re-scored.
 
+- [x] **Saved spiffs (the A-list)** (Oct 20 2026). `leads.cc_spiff_types` = reusable spiffs; the Spiffs
+      tab's "Saved spiff" dropdown fills $, goal and wording, and turning one on copies them onto a
+      `cc_spiff_windows` row (new cols threshold, type_id) — editing a saved spiff never changes past weeks.
+      Rules live ONLY in public/widgets/shared/spiff-rules.js (same_next, team_goal), loaded by both the
+      Commission and Spiffs tabs. Worker: SPIFF_KINDS allow-list, one programmatic spiff per week
+      (overlap refused). Verified: all 14 Fridays' payouts unchanged; team_goal reproduces Oct 5–11 ($176).
+      New spiff = a row in cc_spiff_types if an existing rule fits; else a new rule + SPIFF_KINDS entry.
+      Known gap: owner Payouts (/api/admin/payroll) still counts same/next every week, window or not.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

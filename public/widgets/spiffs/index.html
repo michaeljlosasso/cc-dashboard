@@ -183,11 +183,12 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900;white-space:n
   <div id="content"></div>
 </div>
 
+<script src="/widgets/shared/spiff-rules.js"></script>
 <script>
 "use strict";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const KINDS = { same_next: "Same / next-day appointment" };
+const KINDS = Object.fromEntries(Object.entries(SpiffRules.RULES).map(([k,r]) => [k, r.label]));
 const S = { data:null, err:null, month:null, months:[] };
 const A = { pc: sessionStorage.getItem("cc_admin_pc") || "" };
 
@@ -243,12 +244,11 @@ function render(){
  * Fridays a month had so that's never a surprise.
  *
  * The per-Friday amount MUST equal the Spiff $ column on the Commission tab.
- * The three helpers below are copied from widgets/payroll — buckets(),
- * spiffCounts(), and the window/manual-spiff rules in compute(). If you change
- * how spiffs pay there, change it here too.
+ * Both tabs get the programmatic spiff math from /widgets/shared/spiff-rules.js
+ * (SpiffRules), so that part can't drift. The manual-spiff handling below and
+ * setsWeekFor() mirror widgets/payroll compute()/buckets() — change both.
  */
 const A_DATE = 0, A_USER = 1, A_CAMPAIGN = 2, A_APPT_AT = 10;
-const isTransfer = (campaign) => /transfer/i.test(campaign || "");
 
 function setsWeekFor(fridayIso){          // the week a Friday pays: Mon–Sun before it
   const f = parse(fridayIso);
@@ -257,19 +257,11 @@ function setsWeekFor(fridayIso){          // the week a Friday pays: Mon–Sun b
 }
 function spiffForFriday(fridayIso){
   const [a,b] = setsWeekFor(fridayIso);
-  const win = (S.data.spiff_windows||[]).find(w => w[1]==="same_next" && w[2] <= b && w[3] >= a);
+  const win = SpiffRules.windowFor(S.data.spiff_windows, a, b);
+  const ev = SpiffRules.evaluate(win, S.data.appts, a, b);
   const per = {};  // user -> {n, amt}
-  if(win){
-    for(const r of S.data.appts){
-      const d = r[A_DATE]; if(!d || d < a || d > b) continue;
-      const u = r[A_USER], at = r[A_APPT_AT];
-      if(!u || !at || isTransfer(r[A_CAMPAIGN])) continue;
-      const days = Math.round((parse(at.slice(0,10)) - parse(d)) / 86400000);
-      if(days === 0 || days === 1){
-        per[u] = per[u] || {n:0, amt:0};
-        per[u].n += 1; per[u].amt += win[4];
-      }
-    }
+  for(const [u, n] of Object.entries(ev.qty)){
+    per[u] = { n, amt: n * win[4] };
   }
   let manual = false;
   for(const [id,u,amt,note,d] of (S.data.spiffs||[])){
@@ -287,7 +279,8 @@ function spiffForFriday(fridayIso){
   // the part before " — " is the description, the rest is per-agent detail.
   const manualNotes = [...new Set((S.data.spiffs||[])
     .filter(sp => sp[4] >= a && sp[4] <= b).map(sp => String(sp[3]||"").split(" — ")[0].trim()).filter(Boolean))];
-  return { per, win, manual, manualNotes, setsWeek:[a,b], on: !!win || manual };
+  const goal = SpiffRules.goalLine(win, ev, b < iso(new Date()));
+  return { per, win, ev, goal, manual, manualNotes, setsWeek:[a,b], on: !!win || manual };
 }
 function fridaysIn(ym){
   const [y,m] = ym.split("-").map(Number); const out = [];
@@ -454,6 +447,7 @@ function windowsCard(){
     let desc, rate, qual;
     if(f.win){
       desc = esc(f.win[5] || KINDS[f.win[1]] || f.win[1]);
+      if(f.goal) desc += `<span class="sub"> · ${esc(f.goal)}</span>`;
       if(f.manual) desc += `<span class="sub"> + ${esc(f.manualNotes.join(", ") || "other spiffs")}</span>`;
       rate = `${money(f.win[4])} each`; qual = String(n);
     } else if(f.manual){
@@ -478,14 +472,22 @@ function windowsCard(){
 
   // Admin: turn a spiff on. Defaults to next week, the one usually being decided.
   const nxt = weekOf(addDays(new Date(),7));
+  // The A-list: saved spiffs (leads.cc_spiff_types, admin payload only).
+  // Picking one fills in its $, goal and wording; all three can still be
+  // tweaked for that one week. What's saved on the week is a copy.
+  const types = S.data.spiff_types || [];
+  const t0 = types[0];
   const form = A.pc ? `
     <div class="form">
-      <div><label>Spiff type</label>
-        <select id="f_kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <div><label>Saved spiff</label>
+        <select id="f_type">${types.length
+          ? types.map(t=>`<option value="${esc(t[0])}">${esc(t[1])}</option>`).join("")
+          : Object.entries(KINDS).map(([k,v])=>`<option value="kind:${k}">${esc(v)}</option>`).join("")}</select></div>
       <div><label>Bookings from (Mon)</label><input type="date" id="f_start" value="${nxt[0]}"></div>
       <div><label>Bookings to (Sun)</label><input type="date" id="f_end" value="${nxt[1]}"></div>
-      <div><label>$ each</label><input type="number" id="f_rate" step="0.5" min="0" value="5"></div>
-      <div style="grid-column:1/-1"><label>Description agents see</label><input type="text" id="f_note" value="Same-day or next-day appointments"></div>
+      <div><label>$ each</label><input type="number" id="f_rate" step="0.5" min="0" value="${t0 ? t0[3] : 5}"></div>
+      <div id="f_thr_wrap" style="${t0 && t0[2]==="team_goal" ? "" : "display:none"}"><label>Team goal (appts)</label><input type="number" id="f_thr" step="1" min="1" value="${t0 && t0[4] ? t0[4] : ""}"></div>
+      <div style="grid-column:1/-1"><label>Description agents see</label><input type="text" id="f_note" value="${esc(t0 ? t0[5] : "Same-day or next-day appointments")}"></div>
     </div>
     <div class="form-actions">
       <button class="btn pri" id="f_save">Turn spiff on</button>
@@ -526,12 +528,31 @@ async function adminPost(path, payload, msgEl){
 
 function wire(){
   const save = document.getElementById("f_save");
+  const sel = document.getElementById("f_type");
+  // Which rule + saved spiff the dropdown currently means.
+  const picked = () => {
+    const val = sel ? sel.value : "";
+    if(val.startsWith("kind:")) return { kind: val.slice(5), type: null };
+    const t = (S.data.spiff_types||[]).find(x => x[0] === val);
+    return t ? { kind: t[2], type: t } : { kind: "same_next", type: null };
+  };
+  if(sel) sel.onchange = () => {
+    const { kind, type } = picked();
+    if(type){
+      document.getElementById("f_rate").value = type[3];
+      document.getElementById("f_note").value = type[5] || "";
+      document.getElementById("f_thr").value = type[4] || "";
+    }
+    document.getElementById("f_thr_wrap").style.display = kind === "team_goal" ? "" : "none";
+  };
   if(save) save.onclick = async ()=>{
     const v = id => document.getElementById(id).value;
+    const { kind, type } = picked();
     save.disabled = true;
     const ok = await adminPost("/api/spiff-window", {
-      kind: v("f_kind"), start_date: v("f_start"), end_date: v("f_end"),
+      kind, type_id: type ? type[0] : "", start_date: v("f_start"), end_date: v("f_end"),
       rate: Number(v("f_rate")), note: v("f_note"),
+      threshold: kind === "team_goal" ? Number(v("f_thr")) : null,
     }, "f_msg");
     save.disabled = false;
     if(ok) await reload();
