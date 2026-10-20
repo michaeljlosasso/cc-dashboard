@@ -215,7 +215,7 @@ async function load(){
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
     document.getElementById("freshness").textContent =
-      `Rates: $${j.rates.appt}/appt · $${j.rates.same_next} same-next · $${j.rates.hourly}/hr` +
+      `Rates: $${j.rates.appt}/appt · $${j.rates.hourly}/hr` +
       Object.entries(j.rates.hourly_overrides||{}).map(([u,v])=>{
         const a = (j.agents||[]).find(x=>x.user===u);
         return ` · ${a ? String(a.name).split(" ")[0] : u} $${Number(v).toFixed(2)}/hr`;
@@ -283,7 +283,7 @@ function kpis(){
     </div>`;
   return `<div class="kpi-row">
     ${tile("c-magenta", ic('<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
-      "Friday Payout", usd(t.payout), "appointments + same/next + spiffs")}
+      "Friday Payout", usd(t.payout), "appointments + spiffs")}
     ${tile("c-purple", ic('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
       "Hourly Cost", usd(t.hourly), `${t.hours.toFixed(1)} hours logged`)}
     ${tile("c-cyan", ic('<path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/>'),
@@ -295,7 +295,11 @@ function kpis(){
 
 function table(){
   const t = totals();
-  const cov = S.data.coverage || { dated:0, appts:0 };
+  // The week's spiff (only if one was turned on), from the shared spiff rules.
+  const sp = S.data.spiff;
+  const spiffLine = sp
+    ? `Spiff this week: ${esc(sp.note || sp.kind)} — $${sp.rate} each${sp.goal ? ` (${esc(sp.goal)})` : ""}.`
+    : "No spiff was on this week.";
   const rows = S.data.agents.map(a=>`
     <tr>
       <td>${esc(a.name)}</td>
@@ -314,14 +318,14 @@ function table(){
   return `<div class="card">
     <div class="eyebrow">Owner View</div>
     <h2 class="card-h">What everyone makes — week of ${fmt(S.data.week)}</h2>
-    <p class="card-sub">Friday payout is the appointment side. Hourly is the Monday payout.</p>
+    <p class="card-sub">Friday payout is the appointment side. Hourly is the Monday payout. ${spiffLine}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr>
         <th>Agent</th>
         <th>Appts</th><th>Appt $</th>
-        <th>Same/Next</th><th>S/N $</th>
-        <th>Spiffs</th>
+        <th>Spiff Qty</th><th>Spiff $</th>
+        <th>By Hand</th>
         <th>Friday</th>
         <th>Hours</th><th>Hourly $</th>
         <th>Total Cost</th><th>$ / Appt</th>
@@ -330,7 +334,7 @@ function table(){
       <tfoot><tr>
         <td>Total</td>
         <td class="mono">${t.appts}</td><td class="mono">${usd(t.appts * S.data.rates.appt)}</td>
-        <td class="mono">${t.same_next || "—"}</td><td class="mono">${usd(t.same_next * S.data.rates.same_next)}</td>
+        <td class="mono">${t.same_next || "—"}</td><td class="mono">${usd(S.data.agents.reduce((s,x)=>s+x.sn_pay,0))}</td>
         <td class="mono">${usd(t.spiffs)}</td>
         <td class="mono">${usd(t.payout)}</td>
         <td class="mono">${t.hours.toFixed(1)}</td><td class="mono">${usd(t.hourly)}</td>
@@ -339,11 +343,7 @@ function table(){
       </tr></tfoot>
     </table>
     </div>
-    ${cov.dated < cov.appts ? `<div class="note">
-      <strong>Same/next-day is incomplete for this week.</strong> Only ${cov.dated} of ${cov.appts}
-      appointments carry a scheduled date — Make started sending it Aug 22, 2026, so earlier weeks
-      report zero rather than a wrong number. Demos aren't computed yet (formula still unknown).
-    </div>` : ""}
+
   </div>`;
 }
 

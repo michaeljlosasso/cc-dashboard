@@ -14,6 +14,10 @@
  *   DASH_PASSCODE  — the shared passcode agents use to open the dashboard
  */
 
+// Shared weekly spiff rules (same file the Commission/Spiffs tabs load).
+// Side-effect import: it sets globalThis.SpiffRules.
+import "../public/widgets/shared/spiff-rules.js";
+
 const PROJECT = "ll-media-project";
 const CACHE_SECONDS = 120; // 2 min — short enough that spiff/rate edits show up fast everywhere
 // Read/write scope: admin endpoints INSERT into cc_spiffs / cc_config.
@@ -546,19 +550,6 @@ ORDER BY sort, name
 `;
 const SPIFF_KINDS = ["same_next", "team_goal"];
 
-// Same/next-day bonus counts. Only rows carrying appointment_at can be judged —
-// that field started flowing from Make on Aug 22 2026, so earlier weeks report
-// zero rather than a wrong number. set_at is when the appointment was booked.
-const SQL_SAME_NEXT = `
-SELECT ${SETTER_ALIAS_SQL} AS setter_key,
-       FORMAT_DATE('%Y-%m-%d', DATE(set_at)) AS booked_date,
-       COUNTIF(DATE(appointment_at) = DATE(set_at)) AS same_day,
-       COUNTIF(DATE(appointment_at) = DATE_ADD(DATE(set_at), INTERVAL 1 DAY)) AS next_day,
-       COUNT(*) AS dated
-FROM \`${PROJECT}.leads.appt_setter_map\`
-WHERE appointment_at IS NOT NULL AND setter IS NOT NULL
-GROUP BY 1, 2
-`;
 
 function sqlStr(s, max) {
   return "'" + String(s).slice(0, max || 200).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
@@ -703,10 +694,7 @@ async function handleAdmin(request, env, url, adminSess) {
     end.setUTCDate(end.getUTCDate() + 6);
     const weekEnd = end.toISOString().slice(0, 10);
 
-    const [payload, sameNext] = await Promise.all([
-      buildPayload(env, true),
-      bq(env, SQL_SAME_NEXT).catch(() => ({ rows: [] })),
-    ]);
+    const payload = await buildPayload(env, true);
 
     const cfg = payload.config || {};
     const rate = {
@@ -736,7 +724,7 @@ async function handleAdmin(request, env, url, adminSess) {
 
     const row = (u) => ({
       user: u, name: payload.agents[u] || u,
-      appts: 0, same_day: 0, next_day: 0, dated: 0,
+      appts: 0, spiff_qty: 0,
       demos: null, spiffs: 0, hours: 0,
     });
     const agg = {};
@@ -746,13 +734,14 @@ async function handleAdmin(request, env, url, adminSess) {
       if (!u || d < week || d > weekEnd) continue;
       get(u).appts++;
     }
-    for (const [key, d, same, next, dated] of sameNext.rows) {
-      if (d < week || d > weekEnd) continue;
-      const u = byName[key];
-      if (!u) continue;
-      const r = get(u);
-      r.same_day += Number(same); r.next_day += Number(next); r.dated += Number(dated);
-    }
+    // Programmatic spiff: ONLY when one was turned on for this week, using the
+    // same shared rules as the Commission tab (it used to count same/next-day
+    // every week, spiff or not, which overstated weeks with no spiff).
+    const SR = globalThis.SpiffRules;
+    const spiffWin = SR.windowFor(payload.spiff_windows, week, weekEnd);
+    const spiffEv = SR.evaluate(spiffWin, payload.appts, week, weekEnd);
+    const spiffRate = spiffWin ? Number(spiffWin[4]) : 0;
+    for (const [u, n] of Object.entries(spiffEv.qty)) get(u).spiff_qty += n;
     for (const [, u, amount, , d] of payload.spiffs) {
       if (!u || d < week || d > weekEnd) continue;
       get(u).spiffs += Number(amount);
@@ -763,9 +752,9 @@ async function handleAdmin(request, env, url, adminSess) {
     }
 
     const agents = Object.values(agg).map((r) => {
-      const sn = r.same_day + r.next_day;
+      const sn = r.spiff_qty;
       const appt_pay = r.appts * rate.appt;
-      const sn_pay = sn * rate.same_next;
+      const sn_pay = sn * spiffRate;
       const hourly_rate = hourlyFor(r.user);
       const hourly_pay = Math.round(r.hours * hourly_rate * 100) / 100;
       const payout = appt_pay + sn_pay + r.spiffs;
@@ -784,11 +773,11 @@ async function handleAdmin(request, env, url, adminSess) {
 
     return new Response(JSON.stringify({
       week, week_end: weekEnd, rates: { ...rate, hourly_overrides: hourlyOverrides }, agents,
-      // Straight talk for the UI: how much of the week can actually be judged.
-      coverage: {
-        dated: agents.reduce((s, a) => s + a.dated, 0),
-        appts: agents.reduce((s, a) => s + a.appts, 0),
-      },
+      // The week's programmatic spiff, if any: what it was and whether it paid.
+      spiff: spiffWin ? {
+        kind: spiffWin[1], note: spiffWin[5], rate: spiffRate,
+        goal: SR.goalLine(spiffWin, spiffEv, weekEnd < new Date().toISOString().slice(0, 10)),
+      } : null,
     }), { headers: { ...JSON_HEADERS, "Cache-Control": "no-store" } });
   }
 

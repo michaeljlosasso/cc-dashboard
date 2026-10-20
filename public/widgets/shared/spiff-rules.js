@@ -1,7 +1,9 @@
 /* Spiff rules — the ONE place weekly spiff math lives.
  *
  * Loaded by the Commission tab (widgets/payroll) and the Spiffs tab
- * (widgets/spiffs) so the two can never disagree about what a spiff paid.
+ * (widgets/spiffs), and imported by the Worker for the owner Payouts view, so
+ * none of them can disagree about what a spiff paid. Keep it plain ES5-ish
+ * JavaScript with no imports — it runs in both places.
  *
  * A spiff that's "on" for a week is a row in leads.cc_spiff_windows:
  *   [id, kind, start_date, end_date, rate, note, threshold, type_id]
@@ -90,5 +92,8 @@
                     : `team at ${ev.total} of ${ev.threshold} so far`;
   }
 
-  window.SpiffRules = { RULES, windowFor, evaluate, goalLine, isTransfer };
+  // Browser widgets read window.SpiffRules; the Worker imports this same file
+  // (src/index.js) and reads globalThis.SpiffRules for the owner Payouts view.
+  (typeof window !== "undefined" ? window : globalThis).SpiffRules =
+    { RULES, windowFor, evaluate, goalLine, isTransfer };
 })();

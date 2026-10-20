@@ -80,7 +80,8 @@
       Commission and Spiffs tabs. Worker: SPIFF_KINDS allow-list, one programmatic spiff per week
       (overlap refused). Verified: all 14 Fridays' payouts unchanged; team_goal reproduces Oct 5–11 ($176).
       New spiff = a row in cc_spiff_types if an existing rule fits; else a new rule + SPIFF_KINDS entry.
-      Known gap: owner Payouts (/api/admin/payroll) still counts same/next every week, window or not.
+      Owner Payouts (/api/admin/payroll) now imports the same spiff-rules.js (globalThis.SpiffRules) —
+      fixed Oct 20: it used to count same/next every week (Aug 31, Sep 21, Oct 5, Oct 19 overstated).
 
 ## Parked
 
