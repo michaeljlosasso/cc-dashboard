@@ -341,7 +341,7 @@ ORDER BY booked_date
 //     + nearest createdOn (Eastern -> real UTC) within 24h
 const SQL_APPT_QA = `
 WITH q AS (
-  SELECT appt_uniqueid, credit, credit_reason, credit_quote,
+  SELECT appt_uniqueid, phone_number, appt_date, scorable, credit, credit_reason, credit_quote,
          homeowners, homeowners_reason, homeowners_quote,
          needs_review, review_reason, scored_at
   FROM \`${PROJECT}.vicidial.appointment_qa\`
@@ -349,9 +349,23 @@ WITH q AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY appt_uniqueid ORDER BY scored_at DESC) = 1
 ),
 v AS (
-  SELECT NULLIF(TRIM(leadID), '') AS leadID, RIGHT(REGEXP_REPLACE(IFNULL(phone,''), r'\\D', ''), 10) AS ph, set_at, appt_uniqueid
+  SELECT DISTINCT NULLIF(TRIM(leadID), '') AS leadID,
+         RIGHT(REGEXP_REPLACE(IFNULL(phone,''), r'\\D', ''), 10) AS ph, set_at
   FROM \`${PROJECT}.leads.vw_appointments_qa\`
-  WHERE appt_uniqueid IS NOT NULL
+),
+-- Same pairing as the view (phone, call within 2 days before / 1 day after the set), but when a
+-- booking has more than one score, prefer a real (scorable) one, then the closest, then the newest.
+-- The scorer's fallback writes a scorable row for bookings whose only score was "not scorable".
+vq AS (
+  SELECT v.leadID, v.ph, v.set_at, q.appt_uniqueid, q.scored_at
+  FROM v JOIN q
+    ON q.phone_number = v.ph
+   AND TIMESTAMP(DATETIME(q.appt_date), 'America/New_York')
+       BETWEEN TIMESTAMP_SUB(v.set_at, INTERVAL 2 DAY) AND TIMESTAMP_ADD(v.set_at, INTERVAL 1 DAY)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY v.ph, v.set_at
+    ORDER BY IF(q.scorable = 'YES', 0, 1),
+             ABS(TIMESTAMP_DIFF(v.set_at, TIMESTAMP(DATETIME(q.appt_date), 'America/New_York'), MINUTE)),
+             q.scored_at DESC) = 1
 ),
 l AS (
   SELECT leadID, RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph,
@@ -360,18 +374,18 @@ l AS (
   WHERE affiliateID = 212 AND createdOnDate >= '2026-10-01'
 ),
 lv AS (
-  SELECT v.appt_uniqueid, v.set_at,
-         COALESCE(ANY_VALUE(v.leadID),
-           ARRAY_AGG(l.leadID IGNORE NULLS ORDER BY ABS(TIMESTAMP_DIFF(l.ts, v.set_at, SECOND)) LIMIT 1)[SAFE_OFFSET(0)]) AS lead_id
-  FROM v LEFT JOIN l ON v.leadID IS NULL AND l.ph = v.ph AND ABS(TIMESTAMP_DIFF(l.ts, v.set_at, HOUR)) <= 24
-  GROUP BY v.appt_uniqueid, v.set_at, v.ph
+  SELECT vq.appt_uniqueid, vq.set_at, ANY_VALUE(vq.scored_at) AS scored_at,
+         COALESCE(ANY_VALUE(vq.leadID),
+           ARRAY_AGG(l.leadID IGNORE NULLS ORDER BY ABS(TIMESTAMP_DIFF(l.ts, vq.set_at, SECOND)) LIMIT 1)[SAFE_OFFSET(0)]) AS lead_id
+  FROM vq LEFT JOIN l ON vq.leadID IS NULL AND l.ph = vq.ph AND ABS(TIMESTAMP_DIFF(l.ts, vq.set_at, HOUR)) <= 24
+  GROUP BY vq.appt_uniqueid, vq.set_at, vq.ph
 )
 SELECT lv.lead_id, q.credit, IFNULL(q.credit_reason,'') AS credit_reason, IFNULL(q.credit_quote,'') AS credit_quote,
        q.homeowners, IFNULL(q.homeowners_reason,'') AS homeowners_reason, IFNULL(q.homeowners_quote,'') AS homeowners_quote,
        IF(q.needs_review, 1, 0) AS needs_review, IFNULL(q.review_reason,'') AS review_reason
 FROM lv JOIN q USING (appt_uniqueid)
 WHERE lv.lead_id IS NOT NULL
-QUALIFY ROW_NUMBER() OVER (PARTITION BY lv.lead_id ORDER BY q.scored_at DESC) = 1
+QUALIFY ROW_NUMBER() OVER (PARTITION BY lv.lead_id ORDER BY IF(q.scorable = 'YES', 0, 1), q.scored_at DESC) = 1
 `;
 
 // ADMIN ONLY. Which appointments were probably set by text, not a call.
