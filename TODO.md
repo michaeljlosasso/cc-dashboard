@@ -68,6 +68,11 @@
       MERGE) via /api/qa-override; never touches vicidial.appointment_qa. Edit wins everywhere (pill,
       filters, export); everyone sees the corrected pill, note is admin-only. Hover shows scorer's original.
 
+- [x] **QA rubric v3** (Oct 20 2026, Manny): any yes to the credit question = Pass (hedged too),
+      "1650" = 650, tax-credit wording counts; quote check respects ellipses. Job image
+      vicidial-appointment-qa:v3-*, reference copy + rollback in qa-job/. 52 Unclear-credit rows
+      (last 14 days) backed up to leads.appointment_qa_backup_20261020 and re-scored.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
