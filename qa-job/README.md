@@ -41,3 +41,9 @@ Bookings set on/after 2026-10-19 that still had no real score now always get one
   appt_uniqueid `map-<phone>-<set_at>`.
 - Dashboard join prefers a scorable row when a booking has more than one.
 - First run filled Angela Wagner (Pass / Not Asked), Paul Wehrle, John Mcgee, Diana Campo (Not Asked).
+
+## v4 — QA spiff (Oct 20 2026, Manny)
+Image `v4-20261020160905`. Unclear now always means the setter ASKED: a credit requirement only stated is
+Not Asked (`stated_only`); a homeowners line nobody answered is Not Asked (`no_acknowledgment`).
+That makes pill = pay for the QA spiff (Yes $2, Unclear $1 per question; No / Not Asked $0).
+10 affected rows from Oct 19+ backed up to `leads.appointment_qa_backup_20261020_v4` and re-scored.

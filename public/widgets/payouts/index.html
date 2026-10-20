@@ -300,6 +300,8 @@ function table(){
   const spiffLine = sp
     ? `Spiff this week: ${esc(sp.note || sp.kind)} — $${sp.rate} each${sp.goal ? ` (${esc(sp.goal)})` : ""}.`
     : "No spiff was on this week.";
+  const qa = S.data.qa_spiff;
+  const qaLine = qa ? ` QA spiff on: $${qa.rate} per point (Yes 2, Unclear 1, per question).` : "";
   const rows = S.data.agents.map(a=>`
     <tr>
       <td>${esc(a.name)}</td>
@@ -307,6 +309,7 @@ function table(){
       <td class="mono">${usd(a.appt_pay)}</td>
       <td class="mono">${a.same_next || '<span class="dim">—</span>'}</td>
       <td class="mono">${a.sn_pay ? usd(a.sn_pay) : '<span class="dim">—</span>'}</td>
+      <td class="mono">${a.qa_pay ? usd(a.qa_pay) : '<span class="dim">—</span>'}</td>
       <td class="mono">${a.spiffs ? usd(a.spiffs) : '<span class="dim">—</span>'}</td>
       <td class="mono pay">${usd(a.payout)}</td>
       <td class="mono">${a.hours.toFixed(1)}</td>
@@ -318,23 +321,24 @@ function table(){
   return `<div class="card">
     <div class="eyebrow">Owner View</div>
     <h2 class="card-h">What everyone makes — week of ${fmt(S.data.week)}</h2>
-    <p class="card-sub">Friday payout is the appointment side. Hourly is the Monday payout. ${spiffLine}</p>
+    <p class="card-sub">Friday payout is the appointment side. Hourly is the Monday payout. ${spiffLine}${qaLine}</p>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr>
         <th>Agent</th>
         <th>Appts</th><th>Appt $</th>
         <th>Spiff Qty</th><th>Spiff $</th>
-        <th>By Hand</th>
+        <th>QA $</th><th>By Hand</th>
         <th>Friday</th>
         <th>Hours</th><th>Hourly $</th>
         <th>Total Cost</th><th>$ / Appt</th>
       </tr></thead>
-      <tbody>${rows || `<tr><td colspan="11" class="dim" style="padding:30px;text-align:center">No activity this week.</td></tr>`}</tbody>
+      <tbody>${rows || `<tr><td colspan="12" class="dim" style="padding:30px;text-align:center">No activity this week.</td></tr>`}</tbody>
       <tfoot><tr>
         <td>Total</td>
         <td class="mono">${t.appts}</td><td class="mono">${usd(t.appts * S.data.rates.appt)}</td>
         <td class="mono">${t.same_next || "—"}</td><td class="mono">${usd(S.data.agents.reduce((s,x)=>s+x.sn_pay,0))}</td>
+        <td class="mono">${usd(S.data.agents.reduce((s,x)=>s+(x.qa_pay||0),0))}</td>
         <td class="mono">${usd(t.spiffs)}</td>
         <td class="mono">${usd(t.payout)}</td>
         <td class="mono">${t.hours.toFixed(1)}</td><td class="mono">${usd(t.hourly)}</td>

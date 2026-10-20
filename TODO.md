@@ -83,6 +83,13 @@
       Owner Payouts (/api/admin/payroll) now imports the same spiff-rules.js (globalThis.SpiffRules) —
       fixed Oct 20: it used to count same/next every week (Aug 31, Sep 21, Oct 5, Oct 19 overstated).
 
+- [x] **QA spiff** (Oct 20 2026, on for bookings Oct 19–25, pays Fri Oct 30). Rule `qa_bonus` in
+      spiff-rules.js: per non-transfer appointment, per question, Yes = 2 pts, Unclear = 1, else 0;
+      $1/pt; follows Manny's pencil edits. Stacks with the volume spiff (STACKING_KINDS; one of each
+      per week). Shown on Commission (inside Spiff $), Spiffs tab, owner Payouts (QA $ column).
+      Saved spiff `qa-spiff-1`. Scorer rubric v4 so pill = pay. Open: SMS booking flow must ask both
+      questions or SMS bookings (mostly Jon's) score Not Asked.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

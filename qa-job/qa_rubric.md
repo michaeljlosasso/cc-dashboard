@@ -1,4 +1,4 @@
-# QA rubric v3 — Credit Confirmed + All Homeowners Present
+# QA rubric v4 — Credit Confirmed + All Homeowners Present
 
 You are scoring an outbound appointment-setting conversation (home improvement: bath, windows,
 roofing, siding, solar) between an LL Media setter and a homeowner. The conversation may span
@@ -27,13 +27,17 @@ worded around financing, "tax credits" or "incentives".
 
 Manny's standard (v3): ANY yes from the homeowner to the credit question is a Pass, including hedged
 ones. Only a no, a number below the threshold, or a real non-answer is not a Pass.
+v4 (pays a QA spiff): Unclear always means the setter ASKED and got no clear answer. A requirement
+that was only stated, never asked, is Not Asked. The same goes for the homeowners line: said with no
+reply = Not Asked.
 
 | Value | reason code | When |
 |---|---|---|
 | Pass | `confirmed` | Setter asked about credit as a question ("is your score above 640?", "how's your credit?", "do you think you'd qualify with 650?") AND the homeowner affirmed: yes / "yeah" / "absolutely" / "oh, absolutely" / "it's good, over 700" / "I'm over that" / a number at or above the setter's stated number. |
 | Pass | `soft_answer` | Asked, and the homeowner gave a hedged yes: "I think so", "well, I think so", "I believe so", "probably", "should be", "should be fine", "it's okay", "it's good". A hedged yes is a yes. |
 | Fail | `below_number` | Homeowner said their credit is below the stated number (e.g. "like 506" when the setter said 650), bad, or "no" — and the appointment was still set. |
-| Unclear | `no_clear_answer` | Setter stated a credit requirement or mentioned credit, but the homeowner never answered about their score — deflected, changed subject, "not sure", "I don't know", "I'll pay cash", or the setter moved on. Read the homeowner's whole reply in context: "I had that score in college — who has a score that low?" means their score is well above it → Pass. An "okay" to a plain statement "we require a 650" (no question asked) is agreeing to the rule, not confirming the score → Unclear. But if the setter ASKED ("do you think you'll qualify?", "would you say yours is?") and the homeowner said yes in any form → Pass. |
+| Unclear | `no_clear_answer` | Setter ASKED about credit as a question, but the homeowner never answered about their score — deflected, changed subject, "not sure", "I don't know", "I'll pay cash". Read the homeowner's whole reply in context: "I had that score in college — who has a score that low?" means their score is well above it → Pass. If the setter asked and the homeowner said yes in any form → Pass. |
+| Not Asked | `stated_only` | Setter only STATED a credit requirement ("we just require a 650 to finance") and never asked a question about the homeowner's credit. An "okay" to the statement is agreeing to the rule, not answering → still Not Asked / `stated_only`. Mentioning "financing options" without the number or a question is also `stated_only`. |
 | Unclear | `garbled` | Credit is discussed but the transcript is too garbled at that point to tell. |
 | Not Asked | `not_asked` | Credit never comes up. |
 
@@ -47,7 +51,7 @@ ones. Only a no, a number below the threshold, or a real non-answer is not a Pas
 | Fail | `owner_absent` | Homeowner said a spouse / co-owner — or the homeowner themself — will NOT be there ("my wife works", "someone else can let them in") and the appointment was set anyway. |
 | Fail | `decision_maker_absent` | Booked with a non-owner (property manager, relative) while the actual owner / final decision maker was not asked to attend. |
 | Unclear | `bundled_with_credit` | Setter said the homeowner line in the same breath as the credit question; the homeowner answered only the credit part. |
-| Unclear | `no_acknowledgment` | Setter said it, then moved straight on; the homeowner never responded to it. |
+| Not Asked | `no_acknowledgment` | Setter said it, then moved straight on; the homeowner never responded to it. A statement nobody answered doesn't count as asking. |
 | Unclear | `ambiguous` | Answer unclear or garbled, or the setter gave the wrong rule ("either you or your husband is fine"). |
 | Not Asked | `not_asked` | Other owners / decision makers never addressed. Confirming "you're the homeowner" alone does NOT count — that is ownership, not attendance of all owners. |
 

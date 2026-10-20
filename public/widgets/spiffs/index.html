@@ -263,6 +263,15 @@ function spiffForFriday(fridayIso){
   for(const [u, n] of Object.entries(ev.qty)){
     per[u] = { n, amt: n * win[4] };
   }
+  // QA spiff stacks on top: points × rate. Adds dollars, not "qualifying"
+  // bookings (points aren't bookings).
+  const qaWin = SpiffRules.stackFor(S.data.spiff_windows, a, b);
+  const qaPts = SpiffRules.evaluate(qaWin, S.data.appts, a, b, S.data).qty;
+  let qaTotalPts = 0;
+  for(const [u, pts] of Object.entries(qaPts)){
+    per[u] = per[u] || {n:0, amt:0};
+    per[u].amt += pts * qaWin[4]; qaTotalPts += pts;
+  }
   let manual = false;
   for(const [id,u,amt,note,d] of (S.data.spiffs||[])){
     if(d >= a && d <= b){
@@ -280,7 +289,7 @@ function spiffForFriday(fridayIso){
   const manualNotes = [...new Set((S.data.spiffs||[])
     .filter(sp => sp[4] >= a && sp[4] <= b).map(sp => String(sp[3]||"").split(" — ")[0].trim()).filter(Boolean))];
   const goal = SpiffRules.goalLine(win, ev, b < iso(new Date()));
-  return { per, win, ev, goal, manual, manualNotes, setsWeek:[a,b], on: !!win || manual };
+  return { per, win, ev, goal, qaWin, qaTotalPts, manual, manualNotes, setsWeek:[a,b], on: !!win || !!qaWin || manual };
 }
 function fridaysIn(ym){
   const [y,m] = ym.split("-").map(Number); const out = [];
@@ -448,8 +457,13 @@ function windowsCard(){
     if(f.win){
       desc = esc(f.win[5] || KINDS[f.win[1]] || f.win[1]);
       if(f.goal) desc += `<span class="sub"> · ${esc(f.goal)}</span>`;
+      if(f.qaWin) desc += `<span class="sub"> + ${esc(f.qaWin[5] || "QA spiff")} (${f.qaTotalPts} pts × ${money(f.qaWin[4])})</span>`;
       if(f.manual) desc += `<span class="sub"> + ${esc(f.manualNotes.join(", ") || "other spiffs")}</span>`;
       rate = `${money(f.win[4])} each`; qual = String(n);
+    } else if(f.qaWin){
+      desc = esc(f.qaWin[5] || "QA spiff");
+      if(f.manual) desc += `<span class="sub"> + ${esc(f.manualNotes.join(", ") || "other spiffs")}</span>`;
+      rate = `${money(f.qaWin[4])}/point`; qual = `${f.qaTotalPts} pts`;
     } else if(f.manual){
       desc = esc(f.manualNotes.join(", ") || "Spiff");
       const each = n ? payout / n : 0;
@@ -458,7 +472,8 @@ function windowsCard(){
     } else {
       desc = `<span class="sub">No spiff</span>`; rate = "—"; qual = "—";
     }
-    const del = A.pc && f.win ? `<button class="del" data-id="${esc(f.win[0])}" title="Turn this spiff off">✕</button>` : "";
+    const del = !A.pc ? "" : [f.win, f.qaWin].filter(Boolean).map(w =>
+      `<button class="del" data-id="${esc(w[0])}" title="Turn off: ${esc(w[5] || w[1])}">✕</button>`).join(" ");
     return `<tr>
       <td class="agent-name">Fri ${fmt(f.date)}${f.upcoming?` <span class="pill p-future">Upcoming</span>`:""}</td>
       <td class="mono">${fmt(a)} – ${fmt(b)}</td>
@@ -485,7 +500,7 @@ function windowsCard(){
           : Object.entries(KINDS).map(([k,v])=>`<option value="kind:${k}">${esc(v)}</option>`).join("")}</select></div>
       <div><label>Bookings from (Mon)</label><input type="date" id="f_start" value="${nxt[0]}"></div>
       <div><label>Bookings to (Sun)</label><input type="date" id="f_end" value="${nxt[1]}"></div>
-      <div><label>$ each</label><input type="number" id="f_rate" step="0.5" min="0" value="${t0 ? t0[3] : 5}"></div>
+      <div><label>$ each (QA: per point)</label><input type="number" id="f_rate" step="0.5" min="0" value="${t0 ? t0[3] : 5}"></div>
       <div id="f_thr_wrap" style="${t0 && t0[2]==="team_goal" ? "" : "display:none"}"><label>Team goal (appts)</label><input type="number" id="f_thr" step="1" min="1" value="${t0 && t0[4] ? t0[4] : ""}"></div>
       <div style="grid-column:1/-1"><label>Description agents see</label><input type="text" id="f_note" value="${esc(t0 ? t0[5] : "Same-day or next-day appointments")}"></div>
     </div>

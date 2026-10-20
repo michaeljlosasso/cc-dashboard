@@ -548,7 +548,9 @@ FROM \`${PROJECT}.leads.cc_spiff_types\`
 WHERE NOT IFNULL(archived, FALSE)
 ORDER BY sort, name
 `;
-const SPIFF_KINDS = ["same_next", "team_goal"];
+const SPIFF_KINDS = ["same_next", "team_goal", "qa_bonus"];
+// Kinds that stack on top of the week's volume spiff (their own track).
+const STACKING_KINDS = ["qa_bonus"];
 
 
 function sqlStr(s, max) {
@@ -724,7 +726,7 @@ async function handleAdmin(request, env, url, adminSess) {
 
     const row = (u) => ({
       user: u, name: payload.agents[u] || u,
-      appts: 0, spiff_qty: 0,
+      appts: 0, spiff_qty: 0, qa_points: 0,
       demos: null, spiffs: 0, hours: 0,
     });
     const agg = {};
@@ -742,6 +744,11 @@ async function handleAdmin(request, env, url, adminSess) {
     const spiffEv = SR.evaluate(spiffWin, payload.appts, week, weekEnd);
     const spiffRate = spiffWin ? Number(spiffWin[4]) : 0;
     for (const [u, n] of Object.entries(spiffEv.qty)) get(u).spiff_qty += n;
+    // QA spiff stacks on top (points × rate), from the same shared rules.
+    const qaWin = SR.stackFor(payload.spiff_windows, week, weekEnd);
+    const qaEv = SR.evaluate(qaWin, payload.appts, week, weekEnd, payload);
+    const qaRate = qaWin ? Number(qaWin[4]) : 0;
+    for (const [u, n] of Object.entries(qaEv.qty)) get(u).qa_points += n;
     for (const [, u, amount, , d] of payload.spiffs) {
       if (!u || d < week || d > weekEnd) continue;
       get(u).spiffs += Number(amount);
@@ -755,14 +762,15 @@ async function handleAdmin(request, env, url, adminSess) {
       const sn = r.spiff_qty;
       const appt_pay = r.appts * rate.appt;
       const sn_pay = sn * spiffRate;
+      const qa_pay = r.qa_points * qaRate;
       const hourly_rate = hourlyFor(r.user);
       const hourly_pay = Math.round(r.hours * hourly_rate * 100) / 100;
-      const payout = appt_pay + sn_pay + r.spiffs;
+      const payout = appt_pay + sn_pay + qa_pay + r.spiffs;
       return {
         ...r,
         hours: Math.round(r.hours * 100) / 100,
         same_next: sn,
-        appt_pay, sn_pay, hourly_rate, hourly_pay,
+        appt_pay, sn_pay, qa_pay, hourly_rate, hourly_pay,
         payout,                                  // Friday: appointment side only
         total_cost: Math.round((payout + hourly_pay) * 100) / 100,
         cost_per_appt: r.appts
@@ -778,6 +786,7 @@ async function handleAdmin(request, env, url, adminSess) {
         kind: spiffWin[1], note: spiffWin[5], rate: spiffRate,
         goal: SR.goalLine(spiffWin, spiffEv, weekEnd < new Date().toISOString().slice(0, 10)),
       } : null,
+      qa_spiff: qaWin ? { note: qaWin[5], rate: qaRate } : null,
     }), { headers: { ...JSON_HEADERS, "Cache-Control": "no-store" } });
   }
 
@@ -813,11 +822,14 @@ async function handleAdmin(request, env, url, adminSess) {
       if (!Number.isInteger(t) || t < 1 || t > 10000) throw new Error("team goal needs a whole number of appointments");
       threshold = String(t);
     }
-    // One programmatic spiff per week: overlapping windows would make the
-    // Commission tab pick one arbitrarily. Turn the old one off first.
+    // One volume spiff per week, plus at most one stacking spiff (QA):
+    // overlapping windows on the same track would make the Commission tab pick
+    // one arbitrarily. Turn the old one off first.
+    const stacks = STACKING_KINDS.includes(kind);
     const clash = await bq(env, `
       SELECT COUNT(*) FROM \`${PROJECT}.leads.cc_spiff_windows\`
       WHERE start_date <= DATE '${end}' AND end_date >= DATE '${start}'
+        AND (kind IN (${STACKING_KINDS.map((k) => `'${k}'`).join(",")})) = ${stacks ? "TRUE" : "FALSE"}
     `);
     if (Number((clash.rows[0] || [0])[0]) > 0) {
       throw new Error("a spiff is already on for those dates — turn it off first");

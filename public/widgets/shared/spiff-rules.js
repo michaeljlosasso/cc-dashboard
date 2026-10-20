@@ -25,6 +25,20 @@
   const isTransfer = (campaign) => /transfer/i.test(campaign || "");
   const parseD = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 
+  // QA spiff points for one appointment's pill: Yes = asked and confirmed,
+  // Unclear = asked, no clear answer. No / Not Asked / not scored = nothing.
+  // A No that got booked anyway earns $0 on purpose (Manny, Oct 20).
+  const QA_POINTS = { "Pass": 2, "Unclear": 1 };
+  // The pill value the Appointments tab shows: Manny's pencil correction wins
+  // over the scorer, so the bonus always follows what agents can see.
+  function qaValue(ctx, leadId, topic) {
+    const edit = ((ctx && ctx.qa_edit) || {})[leadId];
+    if (edit && edit[topic]) return edit[topic];
+    const q = ((ctx && ctx.appt_qa) || {})[leadId];
+    if (!q) return "";
+    return topic === "credit" ? q[0] : q[3];
+  }
+
   const RULES = {
     // $rate for each booking whose appointment is the same day or the next day.
     // eLocal transfers are excluded — they're handed off, not booked, so they
@@ -68,19 +82,47 @@
         return { qty: met ? counts : {}, met, total, threshold };
       },
     },
+
+    // QA spiff (Manny, week of Oct 19 2026): per booked appointment, per
+    // question (credit, homeowner): Yes = 2 points, Unclear = 1 point, else 0.
+    // Pays `rate` per point ($1 → $4 max per appointment). Transfers excluded.
+    // Stacks on top of the week's volume spiff — it's its own track.
+    qa_bonus: {
+      label: "QA spiff (credit + homeowner)",
+      needsThreshold: false,
+      stacks: true,
+      evaluate(rows, a, b, threshold, ctx) {
+        const qty = {};
+        for (const r of rows) {
+          const d = r[A_DATE];
+          if (!d || d < a || d > b) continue;
+          const u = r[A_USER], lead = r[11];
+          if (!u || !lead || isTransfer(r[A_CAMPAIGN])) continue;
+          const pts = (QA_POINTS[qaValue(ctx, lead, "credit")] || 0)
+                    + (QA_POINTS[qaValue(ctx, lead, "home")] || 0);
+          if (pts) qty[u] = (qty[u] || 0) + pts;
+        }
+        return { qty, met: true };
+      },
+    },
   };
 
-  // The programmatic spiff (if any) covering the bookings week [a, b].
-  // One per week — the Worker refuses overlapping windows.
+  // The volume spiff (if any) covering the bookings week [a, b]. One per week —
+  // the Worker refuses overlapping volume windows. Stacking kinds (QA) are
+  // found with stackFor() instead.
   function windowFor(windows, a, b) {
-    return (windows || []).find((w) => RULES[w[1]] && w[2] <= b && w[3] >= a) || null;
+    return (windows || []).find((w) => RULES[w[1]] && !RULES[w[1]].stacks && w[2] <= b && w[3] >= a) || null;
+  }
+  function stackFor(windows, a, b) {
+    return (windows || []).find((w) => RULES[w[1]] && RULES[w[1]].stacks && w[2] <= b && w[3] >= a) || null;
   }
 
-  // -> { qty: {user: qualifying count}, met, total?, threshold? }
-  function evaluate(win, rows, a, b) {
+  // -> { qty: {user: qualifying count or points}, met, total?, threshold? }
+  // ctx = the dashboard payload (appt_qa, qa_edit) for rules that need QA.
+  function evaluate(win, rows, a, b, ctx) {
     if (!win || !RULES[win[1]]) return { qty: {}, met: false };
     const thr = win[6] === null || win[6] === undefined || win[6] === "" ? NaN : Number(win[6]);
-    return RULES[win[1]].evaluate(rows || [], a, b, thr);
+    return RULES[win[1]].evaluate(rows || [], a, b, thr, ctx);
   }
 
   // Short status line for a team-goal week, e.g. "team hit 88 of 80".
@@ -95,5 +137,5 @@
   // Browser widgets read window.SpiffRules; the Worker imports this same file
   // (src/index.js) and reads globalThis.SpiffRules for the owner Payouts view.
   (typeof window !== "undefined" ? window : globalThis).SpiffRules =
-    { RULES, windowFor, evaluate, goalLine, isTransfer };
+    { RULES, windowFor, stackFor, evaluate, goalLine, isTransfer, qaValue, QA_POINTS };
 })();

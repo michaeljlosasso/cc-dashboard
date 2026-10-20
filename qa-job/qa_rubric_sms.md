@@ -12,7 +12,7 @@ homeowner instead. Same fields, same values, same rules as above, with these dif
   asking or stating it.
 - An AUTO confirmation that says "all homeowners must be present" counts as stated. It is a Pass only
   if the homeowner acknowledged it (a reply such as "ok", "yes", "see you then", a thumbs-up). If
-  there is no reply, it is Unclear / `no_acknowledgment`.
+  there is no reply, it is Not Asked / `no_acknowledgment` (v4).
 - A homeowner reply of just "us" (lowercase) is a phone shortcut, not a real reply. Ignore it.
 - A homeowner text that answers a different question in the same message does not acknowledge the
   requirement.

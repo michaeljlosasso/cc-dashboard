@@ -16,14 +16,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-RUBRIC_VERSION = "v3"  # v3 (Oct 20 2026, Manny): any yes to the credit question = Pass, incl. hedged
+RUBRIC_VERSION = "v4"  # v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
 RUBRIC_PATH = Path(__file__).with_name("qa_rubric.md")
 SMS_RUBRIC_PATH = Path(__file__).with_name("qa_rubric_sms.md")
 PROVIDER = os.environ.get("QA_PROVIDER", "openai")          # "openai" (gpt-5, same key as the Leadspedia analyzer) or "anthropic"
 DEFAULT_MODEL = os.environ.get("QA_MODEL", "gpt-5" if PROVIDER == "openai" else "claude-sonnet-4-5")
 
 VALUES = {"Pass", "Fail", "Unclear", "Not Asked", "N/A"}
-CREDIT_REASONS = {"confirmed", "below_number", "no_clear_answer", "soft_answer", "garbled", "not_asked", "not_scorable"}
+CREDIT_REASONS = {"confirmed", "below_number", "no_clear_answer", "soft_answer", "garbled", "stated_only", "not_asked", "not_scorable"}
 HOMEOWNER_REASONS = {"confirmed", "acknowledged", "sole_owner", "owner_absent", "decision_maker_absent",
                      "bundled_with_credit", "no_acknowledgment", "ambiguous", "not_asked", "not_scorable"}
 NOT_REQUIRED = "Not Required"
