@@ -41,6 +41,17 @@
       together with payroll snapshots. The VICIdial call-tier comparison was NOT changed
       (call_date's zone unverified).
 
+- [x] **Admin login** (Oct 20 2026). Same login screen, two passwords: DASH_PASSCODE = agent view,
+      ADMIN_PASSCODE = admin view (Manny's). Role is baked into the cookie; server decides what data
+      ships. /api/me, /api/logout (cookie is HttpOnly — the old JS sign-out never actually worked).
+      Admin payload cached separately (/api/data?role=admin). Admin session satisfies handleAdmin, and
+      the shell sets sessionStorage cc_admin_pc="session" so older tabs' admin controls just appear.
+      Old per-tab passcode prompts still accept ADMIN_PASSCODE; retire them tab by tab.
+      Owner button removed; Owner section shows automatically for admin.
+- [x] **SMS channel (admin only)** on Appointments: column, filter, export. Inferred — no 60s+ dialer
+      call to the phone 24h before the lead posted. Agrees with the QA job's text-vs-call scoring
+      234/241. Manny feeds Jonathan the SMS; agents must not see this.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

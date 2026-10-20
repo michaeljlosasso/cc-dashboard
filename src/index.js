@@ -106,10 +106,28 @@ function getCookie(request, name) {
   return m ? m[1] : null;
 }
 
+// Two logins, one screen (Manny, Oct 20 2026): the agents' DASH_PASSCODE gives
+// the agent view; Manny's ADMIN_PASSCODE gives the admin view. Which one you
+// typed is baked into the cookie, so the server — never the browser — decides
+// whether admin-only data is sent. Changing one password signs out only the
+// people who used that password.
+async function adminSessionValue(env) {
+  const data = new TextEncoder().encode(`cc-dashboard|admin|v1|${env.ADMIN_PASSCODE}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function isAdminSession(request, env) {
+  if (!env.ADMIN_PASSCODE) return false;
+  const c = getCookie(request, COOKIE_NAME);
+  return c !== null && c === (await adminSessionValue(env));
+}
+
 async function isAuthed(request, env) {
   if (!env.DASH_PASSCODE) return true; // gate disabled until secret is set
   const c = getCookie(request, COOKIE_NAME);
-  return c !== null && c === (await sessionValue(env));
+  if (c === null) return false;
+  return c === (await sessionValue(env)) || (await isAdminSession(request, env));
 }
 
 /* -------------------------------------------------------------- bigquery */
@@ -344,6 +362,37 @@ WHERE lv.lead_id IS NOT NULL
 QUALIFY ROW_NUMBER() OVER (PARTITION BY lv.lead_id ORDER BY q.scored_at DESC) = 1
 `;
 
+// ADMIN ONLY. Which appointments were probably set by text, not a call.
+// Nothing records the channel, so this is inferred: no dialer call of 60s+
+// to that phone in the 24h before the lead posted (or 30 min after) = SMS.
+// Both sides compared as Eastern wall-clock (createdOn and call_date both are).
+// Manny feeds Jonathan the SMS work and doesn't want the team seeing it, which
+// is why this only ships in the admin payload.
+const SQL_APPT_SMS = `
+WITH l AS (
+  SELECT leadID, RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph, createdOn
+  FROM \`${PROJECT}.leads.leads_get_all\`
+  WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes' AND createdOnDate >= '2026-06-01'
+    AND NOT REGEXP_CONTAINS(LOWER(IFNULL(campaignName,'')), r'transfer')
+),
+c AS (
+  SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10) AS ph, DATETIME(call_date) AS dt
+  FROM \`${PROJECT}.vicidial.vicidial_log\`
+  WHERE length_in_sec >= 60 AND call_date >= '2026-05-30'
+  UNION ALL
+  SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10), DATETIME(call_date)
+  FROM \`${PROJECT}.vicidial.vicidial_closer_log\`
+  WHERE length_in_sec >= 60 AND call_date >= '2026-05-30'
+)
+SELECT l.leadID
+FROM l LEFT JOIN c
+  ON c.ph = l.ph
+ AND c.dt BETWEEN DATETIME_SUB(l.createdOn, INTERVAL 24 HOUR) AND DATETIME_ADD(l.createdOn, INTERVAL 30 MINUTE)
+WHERE LENGTH(l.ph) = 10
+GROUP BY l.leadID
+HAVING COUNT(c.ph) = 0
+`;
+
 // Hours = actual logged-in time: talk + wait + pause + dispo + dead seconds.
 // Paused breaks (LUNCH/BRK/ADMIN) count; logged-out time does not. Capped at
 // the day's first-to-last span so overlapping timers can't overpay.
@@ -466,11 +515,11 @@ function sqlStr(s, max) {
   return "'" + String(s).slice(0, max || 200).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
 }
 
-async function buildPayload(env) {
+async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -480,6 +529,7 @@ async function buildPayload(env) {
     bq(env, SQL_BREAKS).catch(() => ({ rows: [] })),
     bq(env, SQL_SPIFF_WINDOWS).catch(() => ({ rows: [] })),
     bq(env, SQL_APPT_QA).catch(() => ({ rows: [] })),
+    admin ? bq(env, SQL_APPT_SMS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
   ]);
 
   const agentMap = {};
@@ -516,6 +566,9 @@ async function buildPayload(env) {
     spiff_windows: windows.rows.map((r) => [r[0], r[1], r[2], r[3], Number(r[4]), r[5]]),
     // {set_bonus, sit_bonus, sit_rate, close_rate, avg_project, rev_share, hourly_rate}
     config: configMap,
+    admin: !!admin,
+    // ADMIN ONLY — never in the agent payload. Lead IDs that look texted.
+    ...(admin ? { appt_sms: apptSms.rows.map((r) => r[0]) } : {}),
   };
 }
 
@@ -551,14 +604,17 @@ function isAdmin(body, env) {
 }
 
 async function bustDataCache(url) {
-  const cacheKey = new Request(new URL("/api/data", url.origin).toString(), { method: "GET" });
-  await caches.default.delete(cacheKey);
+  for (const p of ["/api/data", "/api/data?role=admin"]) {
+    await caches.default.delete(new Request(new URL(p, url.origin).toString(), { method: "GET" }));
+  }
 }
 
-async function handleAdmin(request, env, url) {
+async function handleAdmin(request, env, url, adminSess) {
   let body = {};
   try { body = await request.json(); } catch (_) {}
-  if (!isAdmin(body, env)) {
+  // Logged in with the admin password = admin. The older per-tab passcode
+  // prompt still works too, so nothing breaks while tabs move over.
+  if (!adminSess && !isAdmin(body, env)) {
     return new Response(JSON.stringify({ error: "bad admin passcode" }), {
       status: 403, headers: JSON_HEADERS,
     });
@@ -789,6 +845,15 @@ export default {
     if (path === "/api/login" && request.method === "POST") {
       let body = {};
       try { body = await request.json(); } catch (_) {}
+      if (env.ADMIN_PASSCODE && body.passcode === env.ADMIN_PASSCODE) {
+        const v = await adminSessionValue(env);
+        return new Response(JSON.stringify({ ok: true, admin: true }), {
+          headers: {
+            ...JSON_HEADERS,
+            "Set-Cookie": `${COOKIE_NAME}=${v}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${COOKIE_DAYS * 86400}`,
+          },
+        });
+      }
       if (!env.DASH_PASSCODE || body.passcode === env.DASH_PASSCODE) {
         const v = env.DASH_PASSCODE ? await sessionValue(env) : "open";
         return new Response(JSON.stringify({ ok: true }), {
@@ -804,7 +869,21 @@ export default {
       });
     }
 
+    /* ---- logout ----
+     * The session cookie is HttpOnly, so the page's JavaScript can't delete
+     * it — only the server can. Signs out this browser only. */
+    if (path === "/api/logout" && request.method === "POST") {
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: {
+          ...JSON_HEADERS,
+          "Cache-Control": "no-store",
+          "Set-Cookie": `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+        },
+      });
+    }
+
     const authed = await isAuthed(request, env);
+    const adminSess = authed && (await isAdminSession(request, env));
 
     /* ---- Make.com appointment ingest ---- */
     // POST /api/appt  with header X-Ingest-Key: <INGEST_KEY>
@@ -873,7 +952,7 @@ export default {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
       }
       try {
-        return await handleAdmin(request, env, url);
+        return await handleAdmin(request, env, url, adminSess);
       } catch (err) {
         return new Response(
           JSON.stringify({ error: String(err && err.message ? err.message : err) }),
@@ -915,12 +994,21 @@ export default {
         });
       }
 
+      if (path === "/api/me") {
+        return new Response(JSON.stringify({ admin: adminSess }), {
+          headers: { ...JSON_HEADERS, "Cache-Control": "no-store" },
+        });
+      }
+
       if (path === "/api/data") {
         const bust = url.searchParams.get("refresh") === "1";
         const cache = caches.default;
-        const cacheKey = new Request(new URL("/api/data", url.origin).toString(), {
-          method: "GET",
-        });
+        // Admin and agent payloads are cached separately — the agent copy
+        // must never contain the admin-only fields.
+        const cacheKey = new Request(
+          new URL(adminSess ? "/api/data?role=admin" : "/api/data", url.origin).toString(),
+          { method: "GET" }
+        );
 
         if (!bust) {
           const hit = await cache.match(cacheKey);
@@ -933,7 +1021,7 @@ export default {
         }
 
         try {
-          const payload = await buildPayload(env);
+          const payload = await buildPayload(env, adminSess);
           const body = JSON.stringify(payload);
           const edgeCopy = new Response(body, {
             headers: { ...JSON_HEADERS, "Cache-Control": `public, max-age=${CACHE_SECONDS}` },

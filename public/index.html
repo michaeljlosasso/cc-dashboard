@@ -127,7 +127,7 @@ body{font-family:"Nunito",system-ui,sans-serif;display:flex;height:100vh;overflo
        onmouseover="this.style.color='#8a56f3'" onmouseout="this.style.color='#a1a1aa'">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </a>
-    <button id="ownerBtn" title="Owner view">Owner</button>
+    <span id="adminTag" title="Signed in with the admin password" style="display:none;font-family:'Outfit',sans-serif;font-size:.68rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#b90053;background:rgba(244,0,112,.10);border-radius:999px;padding:3px 9px">Admin</span>
     <button id="logout" title="Sign out">Sign out</button>
   </div>
 </aside>
@@ -234,7 +234,9 @@ const OWNER_SECTION = {
       chat: "https://claude.ai/cowork/cse_01G9RPR1XJfihMy8gmFT5Jc6" },
   ],
 };
-const isOwner = () => !!sessionStorage.getItem("cc_admin_pc");
+// "session" = signed in with the admin password; the server checks the cookie,
+// so this flag only decides what to draw. It's synced from /api/me below.
+const isOwner = () => sessionStorage.getItem("cc_admin_pc") === "session";
 if (isOwner()) NAV_SECTIONS.push(OWNER_SECTION);
 
 function openState(label, fallback){
@@ -343,28 +345,26 @@ select(first.item, btns[first.idx], NAV_SECTIONS[0].color);
 document.getElementById("burger").onclick = () =>
   document.getElementById("sidebar").classList.toggle("collapsed");
 
-document.getElementById("logout").onclick = () => {
-  document.cookie = "cc_session=; Path=/; Max-Age=0";
+document.getElementById("logout").onclick = async () => {
+  // The session cookie is HttpOnly, so only the server can clear it.
+  try { await fetch("/api/logout", { method:"POST" }); } catch (_) {}
   sessionStorage.removeItem("cc_admin_pc");
-  location.reload();
+  location.href = "/login";
 };
 
-// Owner toggle: reveals the Payouts section for this browser tab only. The
-// passcode is not verified here — the Payouts page checks it server-side and
-// shows nothing if it's wrong. Clears on sign-out or when the tab closes.
-const ownerBtn = document.getElementById("ownerBtn");
-function paintOwnerBtn(){
-  ownerBtn.textContent = isOwner() ? "Owner ✓" : "Owner";
-  ownerBtn.style.color = isOwner() ? "#b90053" : "";
-}
-ownerBtn.onclick = () => {
-  if (isOwner()) { sessionStorage.removeItem("cc_admin_pc"); location.reload(); return; }
-  const v = prompt("Owner passcode");
-  if (!v) return;
-  sessionStorage.setItem("cc_admin_pc", v);
+// Admin vs agent is decided by which password you signed in with. The older
+// tabs read sessionStorage "cc_admin_pc" to show their admin controls; for an
+// admin login it holds "session" and the server accepts it via the cookie.
+// Reload once if the flag is out of step with the login.
+fetch("/api/me", { cache:"no-store" }).then(r => r.ok ? r.json() : null).then(me => {
+  if (!me) return;
+  if (me.admin) document.getElementById("adminTag").style.display = "inline-block";
+  const want = me.admin ? "session" : null;
+  const have = sessionStorage.getItem("cc_admin_pc");
+  if (have === want) return;
+  if (want) sessionStorage.setItem("cc_admin_pc", want); else sessionStorage.removeItem("cc_admin_pc");
   location.reload();
-};
-paintOwnerBtn();
+}).catch(() => {});
 </script>
 </body>
 </html>
