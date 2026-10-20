@@ -386,6 +386,8 @@ WITH l AS (
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes' AND createdOnDate >= '2026-06-01'
     AND NOT REGEXP_CONTAINS(LOWER(IFNULL(campaignName,'')), r'transfer')
+    -- Convertros Call leads are phone calls to Pella, never texts (Manny, Oct 20)
+    AND NOT REGEXP_CONTAINS(LOWER(CONCAT(IFNULL(first_name,''), ' ', IFNULL(last_name,''))), r'convertros')
 ),
 c AS (
   SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_number,''), r'\\D', ''), 10) AS ph, DATETIME(call_date) AS dt
