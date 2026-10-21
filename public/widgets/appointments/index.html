@@ -120,6 +120,10 @@ tbody tr.dup:hover, tbody tr.oot:hover{background:rgba(244,0,112,.09)}
   font-size:.68rem;font-weight:900;letter-spacing:.02em;
   color:#b90053;background:rgba(244,0,112,.11);vertical-align:1px;
 }
+.man-tag{
+  display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
+  font-size:.68rem;font-weight:900;color:#5b3fb0;background:rgba(138,86,243,.12);vertical-align:1px;
+}
 .dup-tag.cross{color:#fff;background:var(--ll-magenta)}
 /* Call QA pills (Credit / Homeowner) — scored from the call recording */
 .qa{display:inline-block;min-width:40px;text-align:center;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:900;cursor:default}
@@ -483,7 +487,7 @@ function tableCard(rows){
     <tr class="${[d?"dup":"", inTerritory(r)?"":"oot"].join(" ").trim()}">
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td>${esc(r[3])} ${esc(r[4])}${tag}${reviewTag(r)}</td>
+      <td>${esc(r[3])} ${esc(r[4])}${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>${isAdmin()?`
@@ -716,6 +720,9 @@ document.addEventListener("click", (e)=>{
   const b = e.target.closest && e.target.closest("button.terr[data-terr]");
   if(b && !b.disabled){ e.stopPropagation(); toggleTerritory(b); }
 }, true);
+
+// Appointments Manny added by hand (leads.cc_appt_manual) carry a MANUAL id.
+const isManual = r => /^MANUAL/.test(String(r[11]||""));
 
 function reviewTag(r){
   const q = (S.data.appt_qa||{})[r[11]];

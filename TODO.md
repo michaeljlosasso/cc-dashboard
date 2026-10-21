@@ -104,6 +104,11 @@
       Diffed all 3,149 leads: only V6QP9H8D changed. Fri Oct 23 back to $960 (Bernardo $175).
       Side effect: Fri Oct 16 view now shows Andres $5 under what was paid (no snapshots).
 
+- [x] **Manual appointments** (Oct 21 2026): `leads.cc_appt_manual` (id MANUAL…, booked_at Eastern,
+      agent_user, campaign, name, phone…) appended to appts in buildPayload — counts and pays like any
+      booking (set, sits, spiffs), tagged "Manual" on Appointments. No UI yet; insert a row.
+      First: MANUAL0001 Ryon Hayman / Onsite Energy, Jon, Oct 21 5:13 PM, campaign "LL Media".
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

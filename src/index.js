@@ -448,6 +448,19 @@ FROM \`${PROJECT}.leads.cc_qa_override\`
 `;
 const QA_VALUES = ["Pass", "Fail", "Unclear", "Not Asked"];
 
+// One-off appointments Manny adds by hand (not in Leadspedia) —
+// leads.cc_appt_manual. Appended to appts in the same row shape, so they count
+// and pay exactly like a Leadspedia booking. lead_id = the MANUAL… id.
+const SQL_APPT_MANUAL = `
+SELECT FORMAT_DATETIME('%Y-%m-%d', booked_at) AS booked_date, agent_user,
+       IFNULL(campaign,'') AS campaign, IFNULL(first_name,'') AS first_name, IFNULL(last_name,'') AS last_name,
+       IFNULL(city,'') AS city, IFNULL(state,'') AS state, 'Yes' AS sold,
+       IFNULL(phone,'') AS phone, IFNULL(email,'') AS email,
+       CAST(NULL AS STRING) AS appt_at, id AS lead_id,
+       FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', booked_at) AS booked_at
+FROM \`${PROJECT}.leads.cc_appt_manual\`
+`;
+
 // Territory (Manny, Oct 20 2026): every appointment is in territory unless he
 // flags it out from the admin view. Display only — never changes pay.
 const SQL_TERRITORY = `
@@ -583,7 +596,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -597,6 +610,7 @@ async function buildPayload(env, admin) {
     bq(env, SQL_QA_OVERRIDE).catch(() => ({ rows: [] })),
     admin ? bq(env, SQL_SPIFF_TYPES).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
     bq(env, SQL_TERRITORY).catch(() => ({ rows: [] })),
+    bq(env, SQL_APPT_MANUAL).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -617,7 +631,8 @@ async function buildPayload(env, admin) {
     // [booked_date, agent_user|null, campaign, first, last, city, state, sold,
     //  phone, email, appt_at, lead_id, booked_at]  — appt_at drives the same/next-day
     //  spiff; booked_at is Leadspedia createdOn (Eastern) to the second.
-    appts: appts.rows,
+    // Leadspedia bookings + hand-added ones (lead_id starts with MANUAL).
+    appts: appts.rows.concat(apptManual.rows),
     // lead_id -> [credit, credit_reason, credit_quote, homeowners,
     //             homeowners_reason, homeowners_quote, needs_review, review_reason]
     // credit/homeowners: Pass | Fail | Unclear | Not Asked | Not Required | N/A
