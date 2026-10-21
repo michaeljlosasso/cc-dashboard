@@ -98,6 +98,12 @@
       JUNK_LEAD_SQL — gone from Appointments and pay; Leadspedia untouched. First use Oct 21: duplicate
       Mark Feder / Pella Albany (removed UD1LHR7N, kept sold 0AWK1IJ7). No UI yet — insert a row.
 
+- [x] **Attribution drift fix** (Oct 21 2026): call tier only counts calls placed before the booking
+      (or ≤1 day after), from CALL_WINDOW_FROM = Oct 5 (a 10s dial Oct 21 had moved Andres's Oct 9 lead
+      to Bernardo). CONVERTROS_FROM moved Oct 12 → Oct 5 so the Oct 5–11 sits (paid Oct 23) skip them.
+      Diffed all 3,149 leads: only V6QP9H8D changed. Fri Oct 23 back to $960 (Bernardo $175).
+      Side effect: Fri Oct 16 view now shows Andres $5 under what was paid (no snapshots).
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

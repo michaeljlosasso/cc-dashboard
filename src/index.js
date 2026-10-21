@@ -191,7 +191,9 @@ const TEST_PHONES = "('4013013422')";
 // or dial to the same phone (e.g. Jon, Oct 12). Applied from the first unpaid
 // sets week (Oct 12) so already-paid weeks don't shift; the lead still shows
 // on the Appointments tab, just Unattributed.
-const CONVERTROS_FROM = "2026-10-12";
+const CONVERTROS_FROM = "2026-10-05";
+// Call-tier window starts with the first unpaid week too, so paid weeks don't shift.
+const CALL_WINDOW_FROM = "2026-10-05";  // moved from Oct 12 (Oct 21): the Oct 5–11 sits pay Fri Oct 23
 const isConvertrosSql = (alias) => `(${alias}.createdOn >= DATETIME '${CONVERTROS_FROM}'
     AND REGEXP_CONTAINS(LOWER(CONCAT(IFNULL(${alias}.first_name,''), ' ', IFNULL(${alias}.last_name,''))), r'convertros'))`;
 
@@ -231,7 +233,9 @@ SELECT
   FORMAT_DATETIME('%Y-%m-%d', s.createdOn) AS booked_date,
   IF(s.createdOn >= DATETIME '${CONVERTROS_FROM}'
      AND REGEXP_CONTAINS(LOWER(CONCAT(IFNULL(ANY_VALUE(s.first_name),''), ' ', IFNULL(ANY_VALUE(s.last_name),''))), r'convertros'), NULL,
-  ARRAY_AGG(c.user
+  ARRAY_AGG(IF(s.createdOn < DATETIME '${CALL_WINDOW_FROM}'
+                 OR DATETIME(c.call_date) <= DATETIME_ADD(s.createdOn, INTERVAL 1 DAY), c.user, NULL)
+    IGNORE NULLS
     ORDER BY IF(c.status='APPTBK',0,1),
              ABS(TIMESTAMP_DIFF(c.call_date, TIMESTAMP(s.createdOn), SECOND))
     LIMIT 1)[SAFE_OFFSET(0)]) AS agent_user,
@@ -317,7 +321,12 @@ picked AS (
     ARRAY_AGG(mp.appointment_at IGNORE NULLS
       ORDER BY ABS(TIMESTAMP_DIFF(mp.set_at, s.created_ts, SECOND))
       LIMIT 1)[SAFE_OFFSET(0)] AS appt_at_phone,
-    ARRAY_AGG(c.user IGNORE NULLS
+    -- From Oct 5 2026, only calls placed before the booking posted (or within a
+    -- day after) can earn it. Before this, a 10-second dial two weeks later
+    -- could take the credit (Oct 21: Bernardo picked up Andres's Oct 9 lead).
+    ARRAY_AGG(IF(s.createdOn < DATETIME '${CALL_WINDOW_FROM}'
+                 OR DATETIME(c.call_date) <= DATETIME_ADD(s.createdOn, INTERVAL 1 DAY), c.user, NULL)
+      IGNORE NULLS
       ORDER BY IF(c.status='APPTBK',0,1),
                ABS(TIMESTAMP_DIFF(c.call_date, TIMESTAMP(s.createdOn), SECOND))
       LIMIT 1)[SAFE_OFFSET(0)] AS call_user
