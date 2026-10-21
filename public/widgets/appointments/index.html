@@ -113,8 +113,8 @@ tbody tr:hover{background:#fafafa}
 .s-sold{color:#007e5c;background:rgba(0,181,128,.10)}
 .s-unsold{color:#8a6d00;background:rgba(255,217,0,.16)}
 /* duplicate = same phone booked twice on the same day */
-tbody tr.dup{background:rgba(244,0,112,.055)}
-tbody tr.dup:hover{background:rgba(244,0,112,.09)}
+tbody tr.dup, tbody tr.oot{background:rgba(244,0,112,.055)}
+tbody tr.dup:hover, tbody tr.oot:hover{background:rgba(244,0,112,.09)}
 .dup-tag{
   display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
   font-size:.68rem;font-weight:900;letter-spacing:.02em;
@@ -447,6 +447,11 @@ function kpis(rows){
 
 // Counts the flagged rows in the current view, so the header says what the
 // pink is before you go looking for it.
+// Out-of-territory count for the header, shaded pink like duplicates.
+function ootNote(rows){
+  const n = rows.filter(r => !inTerritory(r)).length;
+  return n ? ` · <span style="color:#b90053">${n} out of territory</span>` : "";
+}
 function dupNote(rows){
   if(S.dup) return "";
   let dup = 0, cross = 0;
@@ -468,7 +473,7 @@ function tableCard(rows){
           : "Same phone booked twice this day"}">${d.n}× ${cross?"cross":"dupe"}</span>`
       : "";
     return `
-    <tr class="${d?"dup":""}">
+    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot"].join(" ").trim()}">
       <td class="mono">${fmt(r[0])}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td>${esc(r[3])} ${esc(r[4])}${tag}${reviewTag(r)}</td>
@@ -488,7 +493,7 @@ function tableCard(rows){
     <div class="eyebrow">Appointment Log</div>
     <h2 class="card-h">Every Appointment — Week of ${fmt(S.week)}</h2>
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
-      dupNote(rows)}</p>
+      dupNote(rows)}${ootNote(rows)}</p>
     </div>
     <button class="export-btn" id="exportBtn" ${rows.length?"":"disabled"} title="Download every row in this view (all pages) as a CSV">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
