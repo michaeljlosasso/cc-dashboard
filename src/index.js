@@ -195,7 +195,10 @@ const CONVERTROS_FROM = "2026-10-12";
 const isConvertrosSql = (alias) => `(${alias}.createdOn >= DATETIME '${CONVERTROS_FROM}'
     AND REGEXP_CONTAINS(LOWER(CONCAT(IFNULL(${alias}.first_name,''), ' ', IFNULL(${alias}.last_name,''))), r'convertros'))`;
 
+// Leads Manny removed by hand (a booking posted twice, etc.) — table
+// leads.cc_appt_exclude. Leadspedia is untouched; they just don't show or pay.
 const JUNK_LEAD_SQL = `
+    AND leadID NOT IN (SELECT lead_id FROM \`${PROJECT}.leads.cc_appt_exclude\`)
     AND REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', '') NOT IN ${TEST_PHONES}
     AND LOWER(TRIM(CONCAT(IFNULL(first_name,''), ' ', IFNULL(last_name,''))))
         NOT IN ('n a', 'na', 'test test', 'test', 'a a')`;

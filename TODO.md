@@ -94,6 +94,10 @@
       to No (`leads.cc_territory_override`, only "out" rows stored; /api/territory). Everyone sees it,
       filter + export included. Display only — no effect on pay (Manny).
 
+- [x] **Remove a lead by hand**: `leads.cc_appt_exclude` (lead_id, reason) is filtered out in
+      JUNK_LEAD_SQL — gone from Appointments and pay; Leadspedia untouched. First use Oct 21: duplicate
+      Mark Feder / Pella Albany (removed UD1LHR7N, kept sold 0AWK1IJ7). No UI yet — insert a row.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
