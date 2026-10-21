@@ -302,6 +302,9 @@ const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m
 const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
 const fmt = s => { const d=parse(s); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
 const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+// "2026-10-20 21:42:09" -> "9:42 PM" (Eastern, as Leadspedia records it)
+const clock = s => { const [h,m] = String(s).slice(11,16).split(":").map(Number);
+  return `${(h % 12) || 12}:${String(m).padStart(2,"0")} ${h < 12 ? "AM" : "PM"}`; };
 const mondayOf = d => addDays(d, -((d.getDay()+6)%7));
 
 async function load(){
@@ -398,7 +401,11 @@ function filtered(){
     if(S.ch && channel(r) !== S.ch) return false;
     if(S.terr && (inTerritory(r) ? "yes" : "no") !== S.terr) return false;
     return true;
-  }).sort((x,y)=> y[0] < x[0] ? -1 : y[0] > x[0] ? 1 : 0);
+  // Newest booking first, by the exact time it posted (r[12], Eastern).
+  }).sort((x,y)=> {
+    const a = x[12] || x[0], b = y[12] || y[0];
+    return a < b ? 1 : a > b ? -1 : 0;
+  });
 }
 
 function render(){
@@ -474,7 +481,7 @@ function tableCard(rows){
       : "";
     return `
     <tr class="${[d?"dup":"", inTerritory(r)?"":"oot"].join(" ").trim()}">
-      <td class="mono">${fmt(r[0])}</td>
+      <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td>${esc(r[3])} ${esc(r[4])}${tag}${reviewTag(r)}</td>
       <td>${qaPill(r,"credit")}</td>
@@ -528,13 +535,13 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Booked","Setter","First","Last","Credit","Homeowner","In Territory",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
     const q = isTransfer(r) ? null : qaRow(r), d = dupOf(r);
     lines.push([
-      r[0], r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
+      r[0], r[12] ? String(r[12]).slice(11,16) : "", r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
       label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
       d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",

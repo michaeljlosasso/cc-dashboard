@@ -244,7 +244,8 @@ SELECT
   ANY_VALUE(s.phone_home) AS phone,
   ANY_VALUE(s.email_address) AS email,
   CAST(NULL AS STRING) AS appt_at,
-  s.leadID AS lead_id
+  s.leadID AS lead_id,
+  FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', s.createdOn) AS booked_at
 FROM sold s
 LEFT JOIN agent_calls c ON c.ph = s.ph
 GROUP BY s.leadID, s.createdOn
@@ -332,7 +333,8 @@ SELECT
   IF(${isConvertrosSql("p")}, NULL, COALESCE(u.user, p.call_user)) AS agent_user,
   p.campaign, p.first_name, p.last_name, p.city, p.state, p.sold, p.phone, p.email,
   FORMAT_DATETIME('%Y-%m-%d %H:%M', COALESCE(p.appt_at_id, p.appt_at_phone)) AS appt_at,
-  p.leadID AS lead_id
+  p.leadID AS lead_id,
+  FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', p.createdOn) AS booked_at
 FROM picked p
 LEFT JOIN users u ON u.fn = COALESCE(p.set_by_id, p.set_by_phone)
 ORDER BY booked_date
@@ -604,7 +606,8 @@ async function buildPayload(env, admin) {
     meta: { last_sync: (meta.rows[0] || [])[0] || null },
     agents: agentMap,
     // [booked_date, agent_user|null, campaign, first, last, city, state, sold,
-    //  phone, email, appt_at, lead_id]  — appt_at drives the same/next-day spiff.
+    //  phone, email, appt_at, lead_id, booked_at]  — appt_at drives the same/next-day
+    //  spiff; booked_at is Leadspedia createdOn (Eastern) to the second.
     appts: appts.rows,
     // lead_id -> [credit, credit_reason, credit_quote, homeowners,
     //             homeowners_reason, homeowners_quote, needs_review, review_reason]
