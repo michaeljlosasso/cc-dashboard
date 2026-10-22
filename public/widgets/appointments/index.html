@@ -97,6 +97,7 @@ body{
 .mc-help{font-family:"Nunito";font-size:.87rem;font-weight:700;color:var(--muted);margin-top:6px}
 .c-cyan{color:var(--ll-cyan)} .c-green{color:var(--ll-green)}
 .c-purple{color:var(--ll-purple)} .c-yellow{color:#d09f00}
+.c-red{color:var(--ll-magenta)}
 .tbl-scroll{overflow:auto;margin:0 -18px;padding:0 18px}
 table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
 thead th{
@@ -427,9 +428,6 @@ function render(){
 
 function kpis(rows){
   const total = rows.length;
-  const perAgent = {};
-  rows.forEach(r=>{ if(r[1]) perAgent[r[1]]=(perAgent[r[1]]||0)+1; });
-  const top = Object.entries(perAgent).sort((a,b)=>b[1]-a[1])[0];
   const days = {}; rows.forEach(r=>{ days[r[0]]=(days[r[0]]||0)+1; });
   const nDays = Math.max(1, Object.keys(days).length);
 
@@ -450,9 +448,14 @@ function kpis(rows){
     ${tile("c-green", ic('<path d="M20 6L9 17l-5-5"/>'),
       "Today", (days[iso(new Date())]||0).toLocaleString(),
       "appointments booked today")}
-    ${tile("c-purple", ic('<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z"/>'),
-      "Top Setter", top ? esc(S.data.agents[top[0]]||top[0]).split(" ")[0] : "—",
-      top ? `${top[1]} appointment${top[1]===1?"":"s"} this week` : "no appointments yet")}
+    ${(() => {
+      // Out of territory in the selected view (same filters as the table).
+      const oot = rows.filter(r => !inTerritory(r)).length;
+      const pct = total ? Math.round(oot / total * 100) : 0;
+      return tile("c-red", ic('<circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/>'),
+        "Out of Territory", oot.toLocaleString(),
+        oot ? `${pct}% of appointments this week` : "none this week");
+    })()}
   </div>`;
 }
 
