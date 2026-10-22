@@ -697,8 +697,12 @@ function buildTerritory(){
 function terrCell(r){
   if(!r[11]) return '<span class="sub">—</span>';
   const yes = inTerritory(r), cls = yes ? "in" : "out", txt = yes ? "Yes" : "No";
-  if(!isAdmin()) return `<span class="terr ${cls}">${txt}</span>`;
-  return `<button class="terr ${cls}" data-terr="${esc(r[11])}" title="${yes ? "Click to mark out of territory" : "Click to mark in territory"}">${txt}</button>`;
+  // Hover uses the same dark tooltip as the Credit / Homeowner pills.
+  const tip = yes ? "" : ` data-tip-h="Out Of Territory" data-tip-w="" data-tip-q=""`;
+  if(!isAdmin()) return `<span class="terr ${cls}"${tip}>${txt}</span>`;
+  const adminTip = yes ? ` data-tip-h="In Territory" data-tip-w="Click to mark out of territory" data-tip-q=""`
+                       : ` data-tip-h="Out Of Territory" data-tip-w="Click to mark in territory" data-tip-q=""`;
+  return `<button class="terr ${cls}" data-terr="${esc(r[11])}"${adminTip}>${txt}</button>`;
 }
 async function toggleTerritory(btn){
   const lead = btn.dataset.terr, nowIn = !OUT.has(lead);
