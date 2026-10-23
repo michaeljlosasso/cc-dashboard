@@ -115,6 +115,9 @@
       "Comments: Open…" filter (spans all weeks) with "Resolve all shown" + one reply. Table
       `leads.cc_appt_comments`. Export has a Comments column. Saves update locally (no reload).
 
+- [x] **Complaint column** (Oct 23 2026): No by default; admin clicks to flag Yes (red).
+      `leads.cc_complaint_flag`, /api/complaint. Everyone sees it; filter + export. Manual for now.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

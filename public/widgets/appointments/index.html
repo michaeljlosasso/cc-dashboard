@@ -314,6 +314,13 @@ tbody tr:hover .qa-pen{opacity:1}
       </button>
       <div class="pop" id="trPop"><div class="pop-list" id="trList"></div></div>
     </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="cpBtn" aria-expanded="false">
+        <span id="cpLabel">Complaint: All</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="cpPop"><div class="pop-list" id="cpList"></div></div>
+    </div>
     <div class="pop-wrap" id="chWrap" style="display:none">
       <button class="filter-control" id="chBtn" aria-expanded="false">
         <span id="chLabel">Channel: All</span>
@@ -334,7 +341,7 @@ tbody tr:hover .qa-pen{opacity:1}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -372,7 +379,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComments(); showCommentFilter();
+    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComplaints(); buildComments(); showCommentFilter();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -466,6 +473,7 @@ function filtered(){
     if(S.home && qaVal(r,"home") !== S.home) return false;
     if(S.ch && channel(r) !== S.ch) return false;
     if(S.terr && (inTerritory(r) ? "yes" : "no") !== S.terr) return false;
+    if(S.cmp && (hasComplaint(r) ? "yes" : "no") !== S.cmp) return false;
     return true;
   // Newest booking first, by the exact time it posted (r[12], Eastern).
   }).sort((x,y)=> {
@@ -554,7 +562,8 @@ function tableCard(rows){
       <td>${esc(r[3])} ${esc(r[4])}${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
-      <td>${terrCell(r)}</td>${isAdmin()?`
+      <td>${terrCell(r)}</td>
+      <td>${complaintCell(r)}</td>${isAdmin()?`
       <td>${chPill(r)}</td>`:""}
       <td class="mono">${esc(r[8]||"—")}</td>
       <td class="sub">${esc(r[9]||"—")}</td>
@@ -584,8 +593,8 @@ function tableCard(rows){
     </div>
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
-      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Territory</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
-      <tbody>${body || `<tr><td colspan="${isAdmin()?11:10}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Territory</th><th>Complaint</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="${isAdmin()?12:11}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
     ${pages>1?`<div class="pager">
@@ -604,7 +613,7 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory","Complaint",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
@@ -612,7 +621,7 @@ function exportCsv(rows){
     lines.push([
       commentsOf(r).map(c => `[${c[2]}${c[5]==="resolved"?" · resolved":""}] ${c[3]}${c[6] ? ` → ${c[6]}` : ""}`).join(" | "),
       r[0], r[12] ? String(r[12]).slice(11,16) : "", r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
-      label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
+      label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
       d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",
       q ? humanize(q[1]) : "", q ? q[2] : "", q ? humanize(q[4]) : "", q ? q[5] : "",
@@ -627,6 +636,7 @@ function exportCsv(rows){
   if(S.ch) parts.push(S.ch);
   if(S.terr) parts.push("territory-" + S.terr);
   if(S.cm) parts.push("comments-" + S.cm);
+  if(S.cmp) parts.push("complaint-" + S.cmp);
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -758,6 +768,59 @@ function buildTerritory(){
     };
   });
 }
+/* ---- Customer complaints ----
+ * No by default; Manny flags Yes from the admin view (click the pill). Manual
+ * for now. Everyone sees it. Display only. Same pills/colors as Territory,
+ * flipped: No is the good (green) state here.
+ */
+let CMP = new Set();
+const hasComplaint = r => CMP.has(r[11]);
+const CP_OPTS = [["","All"],["yes","Yes"],["no","No"]];
+function buildComplaints(){
+  CMP = new Set(S.data.complaints || []);
+  const list = document.getElementById("cpList");
+  list.innerHTML = CP_OPTS.map(([v,n])=>`<div class="pop-item${v===S.cmp?" on":""}" data-v="${v}">${n}</div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.cmp = el.dataset.v; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.cmp));
+      document.getElementById("cpLabel").textContent = `Complaint: ${(CP_OPTS.find(o=>o[0]===S.cmp)||CP_OPTS[0])[1]}`;
+      closePops(); render();
+    };
+  });
+}
+function complaintCell(r){
+  if(!r[11]) return '<span class="sub">—</span>';
+  const yes = hasComplaint(r), cls = yes ? "out" : "in", txt = yes ? "Yes" : "No";
+  const tip = yes ? ` data-tip-h="Customer Complaint" data-tip-w="" data-tip-q=""` : "";
+  if(!isAdmin()) return `<span class="terr ${cls}"${tip}>${txt}</span>`;
+  const adminTip = yes ? ` data-tip-h="Customer Complaint" data-tip-w="Click to clear" data-tip-q=""`
+                       : ` data-tip-h="No complaint" data-tip-w="Click to flag a complaint" data-tip-q=""`;
+  return `<button class="terr ${cls}" data-cmp="${esc(r[11])}"${adminTip}>${txt}</button>`;
+}
+async function toggleComplaint(btn){
+  const lead = btn.dataset.cmp, now = CMP.has(lead);
+  btn.disabled = true;
+  try{
+    const r = await fetch("/api/complaint", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ admin:"session", lead_id: lead, has_complaint: !now }),
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    if(now) CMP.delete(lead); else CMP.add(lead);
+    S.data.complaints = [...CMP];
+    render();
+  }catch(err){
+    btn.disabled = false; btn.textContent = "Retry";
+    btn.dataset.tipW = "Didn't save: " + String(err.message||err);
+  }
+}
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest && e.target.closest("button.terr[data-cmp]");
+  if(b && !b.disabled){ e.stopPropagation(); toggleComplaint(b); }
+}, true);
+
 function terrCell(r){
   if(!r[11]) return '<span class="sub">—</span>';
   const yes = inTerritory(r), cls = yes ? "in" : "out", txt = yes ? "Yes" : "No";
@@ -1034,7 +1097,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"],["cmBtn","cmPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"],["cmBtn","cmPop"],["cpBtn","cpPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();

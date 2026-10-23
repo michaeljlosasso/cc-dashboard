@@ -476,6 +476,12 @@ FROM \`${PROJECT}.leads.cc_appt_comments\`
 ORDER BY created_at
 `;
 
+// Customer complaints (Manny, Oct 23 2026): No unless he flags one from the
+// admin view. Manual for now. Display only.
+const SQL_COMPLAINTS = `
+SELECT lead_id FROM \`${PROJECT}.leads.cc_complaint_flag\` WHERE has_complaint
+`;
+
 // Territory (Manny, Oct 20 2026): every appointment is in territory unless he
 // flags it out from the admin view. Display only — never changes pay.
 const SQL_TERRITORY = `
@@ -611,7 +617,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments, complaints] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -627,6 +633,7 @@ async function buildPayload(env, admin) {
     bq(env, SQL_TERRITORY).catch(() => ({ rows: [] })),
     bq(env, SQL_APPT_MANUAL).catch(() => ({ rows: [] })),
     bq(env, SQL_COMMENTS).catch(() => ({ rows: [] })),
+    bq(env, SQL_COMPLAINTS).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -686,6 +693,8 @@ async function buildPayload(env, admin) {
     }, {}) } : {}),
     // [id, lead_id, topic, body, author_role, status, reply, created_at, resolved_at, setter_user]
     comments: comments.rows,
+    // Lead IDs with a customer complaint (everyone sees the flag).
+    complaints: complaints.rows.map((r) => r[0]),
     // Lead IDs flagged out of territory (everyone sees the flag; note is admin-only).
     out_territory: territory.rows.map((r) => r[0]),
     ...(admin ? { out_territory_note: Object.fromEntries(territory.rows.filter((r) => r[1]).map((r) => [r[0], r[1]])) } : {}),
@@ -992,6 +1001,26 @@ async function handleAdmin(request, env, url, adminSess) {
     return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
   }
 
+  /* Customer complaint flag (admin). true flags it; false clears it. */
+  if (url.pathname === "/api/complaint") {
+    const id = String(body.lead_id || "");
+    if (!/^[A-Za-z0-9]{6,16}$/.test(id)) throw new Error("bad lead id");
+    if (typeof body.has_complaint !== "boolean") throw new Error("has_complaint must be true or false");
+    if (!body.has_complaint) {
+      await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_complaint_flag\` WHERE lead_id = '${id}'`);
+    } else {
+      await bq(env, `
+        MERGE \`${PROJECT}.leads.cc_complaint_flag\` t
+        USING (SELECT '${id}' AS lead_id) s ON t.lead_id = s.lead_id
+        WHEN MATCHED THEN UPDATE SET has_complaint = TRUE, updated_at = CURRENT_TIMESTAMP()
+        WHEN NOT MATCHED THEN INSERT (lead_id, has_complaint, note, updated_at)
+          VALUES (s.lead_id, TRUE, NULL, CURRENT_TIMESTAMP())
+      `);
+    }
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
   /* Resolve / reopen comments, one or many, with an optional reply (admin). */
   if (url.pathname === "/api/comment/resolve") {
     const ids = Array.isArray(body.ids) ? body.ids.map(String) : [];
@@ -1225,6 +1254,7 @@ export default {
          || path === "/api/hours-adjust" || path === "/api/hours-adjust/delete"
          || path === "/api/qa-override" || path === "/api/territory"
          || path === "/api/comment/resolve" || path === "/api/comment/delete"
+         || path === "/api/complaint"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
