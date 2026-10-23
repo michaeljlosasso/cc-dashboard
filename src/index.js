@@ -479,8 +479,10 @@ ORDER BY created_at
 // Customer complaints (Manny, Oct 23 2026): No unless he flags one from the
 // admin view. Manual for now. Display only.
 const SQL_COMPLAINTS = `
-SELECT lead_id FROM \`${PROJECT}.leads.cc_complaint_flag\` WHERE has_complaint
+SELECT lead_id, IFNULL(reason,'') AS reason, IFNULL(note,'') AS note
+FROM \`${PROJECT}.leads.cc_complaint_flag\` WHERE has_complaint
 `;
+const COMPLAINT_REASONS = ["Credit", "Didn't show", "Not interested", "Out of area", "Wrong product", "Other"];
 
 // Territory (Manny, Oct 20 2026): every appointment is in territory unless he
 // flags it out from the admin view. Display only — never changes pay.
@@ -695,6 +697,9 @@ async function buildPayload(env, admin) {
     comments: comments.rows,
     // Lead IDs with a customer complaint (everyone sees the flag).
     complaints: complaints.rows.map((r) => r[0]),
+    // lead_id -> [reason, note] for flagged complaints (everyone sees it —
+    // it's the buyer's feedback on the booking).
+    complaint_info: Object.fromEntries(complaints.rows.map((r) => [r[0], [r[1], r[2]]])),
     // Lead IDs flagged out of territory (everyone sees the flag; note is admin-only).
     out_territory: territory.rows.map((r) => r[0]),
     ...(admin ? { out_territory_note: Object.fromEntries(territory.rows.filter((r) => r[1]).map((r) => [r[0], r[1]])) } : {}),
@@ -1009,12 +1014,18 @@ async function handleAdmin(request, env, url, adminSess) {
     if (!body.has_complaint) {
       await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_complaint_flag\` WHERE lead_id = '${id}'`);
     } else {
+      // reason/note are optional: a bare toggle keeps whatever was there.
+      const reason = body.reason === undefined ? null : String(body.reason || "");
+      if (reason && !COMPLAINT_REASONS.includes(reason)) throw new Error("unknown reason");
+      const note = body.note === undefined ? null : String(body.note || "");
+      const setR = reason === null ? "" : `, reason = ${reason ? sqlStr(reason, 40) : "NULL"}`;
+      const setN = note === null ? "" : `, note = ${note ? sqlStr(note, 500) : "NULL"}`;
       await bq(env, `
         MERGE \`${PROJECT}.leads.cc_complaint_flag\` t
         USING (SELECT '${id}' AS lead_id) s ON t.lead_id = s.lead_id
-        WHEN MATCHED THEN UPDATE SET has_complaint = TRUE, updated_at = CURRENT_TIMESTAMP()
-        WHEN NOT MATCHED THEN INSERT (lead_id, has_complaint, note, updated_at)
-          VALUES (s.lead_id, TRUE, NULL, CURRENT_TIMESTAMP())
+        WHEN MATCHED THEN UPDATE SET has_complaint = TRUE, updated_at = CURRENT_TIMESTAMP()${setR}${setN}
+        WHEN NOT MATCHED THEN INSERT (lead_id, has_complaint, reason, note, updated_at)
+          VALUES (s.lead_id, TRUE, ${reason ? sqlStr(reason, 40) : "NULL"}, ${note ? sqlStr(note, 500) : "NULL"}, CURRENT_TIMESTAMP())
       `);
     }
     await bustDataCache(url);

@@ -213,6 +213,18 @@ tbody tr:hover .qa-pen{opacity:1}
 .sbtn{border:1px solid var(--ll-border);background:#fff;border-radius:8px;padding:6px 10px;font-family:"Nunito";font-weight:850;font-size:.78rem;cursor:pointer;color:var(--ll-black)}
 .sbtn.pri{background:var(--ll-purple);border-color:var(--ll-purple);color:#fff}
 .sbtn:disabled{opacity:.5;cursor:wait}
+.lead-open{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.lead-open:hover{color:var(--ll-purple);text-decoration:underline;text-underline-offset:3px}
+.dsec{margin-bottom:14px}
+.dsec h4{margin:0 0 8px;font-family:"Outfit",sans-serif;font-size:.7rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#0094aa}
+.dgrid{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:.84rem}
+.dgrid .k{color:var(--muted);font-weight:800}
+.dgrid .v{font-weight:750;word-break:break-word}
+.qa-line{display:flex;align-items:flex-start;gap:8px;margin:6px 0;font-size:.84rem;font-weight:700}
+.qa-line .lbl{width:84px;flex:none;color:var(--muted);font-weight:800;padding-top:3px}
+.qa-line .q{color:#52525b;font-style:italic;font-weight:650;margin-top:4px}
+.cedit{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.cedit select,.cedit input{border:1px solid var(--ll-border);border-radius:8px;padding:6px 8px;font-family:"Nunito";font-size:.82rem;font-weight:700}
 .cp-form{border-top:1px solid #f1f2f4;padding:12px 18px 18px;display:flex;flex-direction:column;gap:8px}
 .cp-form select,.cp-form textarea{border:1px solid var(--ll-border);border-radius:10px;padding:8px 10px;font-family:"Nunito";font-size:.86rem;font-weight:700}
 .cp-form textarea{min-height:80px;resize:vertical}
@@ -568,7 +580,7 @@ function tableCard(rows){
     <tr class="${[d?"dup":"", inTerritory(r)?"":"oot"].join(" ").trim()}">
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td>${esc(r[3])} ${esc(r[4])}${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
+      <td><button class="lead-open" data-open="${esc(r[11]||"")}" title="Open details">${esc(r[3])} ${esc(r[4])}</button>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>
@@ -801,9 +813,11 @@ function buildComplaints(){
 function complaintCell(r){
   if(!r[11]) return '<span class="sub">—</span>';
   const yes = hasComplaint(r), cls = yes ? "out" : "in", txt = yes ? "Yes" : "No";
-  const tip = yes ? ` data-tip-h="Customer Complaint" data-tip-w="" data-tip-q=""` : "";
+  const info = ((S.data.complaint_info||{})[r[11]]) || ["",""];
+  const head = "Customer Complaint" + (info[0] ? " · " + info[0] : "");
+  const tip = yes ? ` data-tip-h="${esc(head)}" data-tip-w="${esc(info[1])}" data-tip-q=""` : "";
   if(!isAdmin()) return `<span class="terr ${cls}"${tip}>${txt}</span>`;
-  const adminTip = yes ? ` data-tip-h="Customer Complaint" data-tip-w="Click to clear" data-tip-q=""`
+  const adminTip = yes ? ` data-tip-h="${esc(head)}" data-tip-w="${esc((info[1] ? info[1] + " · " : "") + "Click to clear")}" data-tip-q=""`
                        : ` data-tip-h="No complaint" data-tip-w="Click to flag a complaint" data-tip-q=""`;
   return `<button class="terr ${cls}" data-cmp="${esc(r[11])}"${adminTip}>${txt}</button>`;
 }
@@ -817,9 +831,9 @@ async function toggleComplaint(btn){
     });
     const j = await r.json().catch(()=>({}));
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-    if(now) CMP.delete(lead); else CMP.add(lead);
+    if(now){ CMP.delete(lead); delete (S.data.complaint_info||{})[lead]; } else CMP.add(lead);
     S.data.complaints = [...CMP];
-    render();
+    render(); if(PANEL) drawPanel();
   }catch(err){
     btn.disabled = false; btn.textContent = "Retry";
     btn.dataset.tipW = "Didn't save: " + String(err.message||err);
@@ -852,7 +866,7 @@ async function toggleTerritory(btn){
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     if(nowIn) OUT.add(lead); else OUT.delete(lead);
     S.data.out_territory = [...OUT];
-    render();
+    render(); if(PANEL) drawPanel();
   }catch(err){
     btn.disabled = false;
     btn.title = "Didn't save: " + String(err.message||err);
@@ -938,7 +952,10 @@ function drawPanel(msg, isErr){
       <div class="sub">${fmt(r[0])} · ${r[1] ? esc(S.data.agents[r[1]]||r[1]) : "Unattributed"} · ${esc(r[2])}</div>
       <button class="cp-close" id="cpClose" title="Close">×</button>
     </div>
-    <div class="cp-list">${list || '<div class="cp-empty">No comments yet.</div>'}</div>
+    <div class="cp-list">
+      ${detailsHtml(r)}
+      <div class="dsec"><h4>Comments</h4>${list || '<div class="cp-empty">No comments yet.</div>'}</div>
+    </div>
     <div class="cp-form">
       <select id="cpTopic">${TOPICS.map(t=>`<option>${t}</option>`).join("")}</select>
       <textarea id="cpBody" maxlength="1000" placeholder="What should Manny know about this appointment?"></textarea>
@@ -948,11 +965,74 @@ function drawPanel(msg, isErr){
       </div>
     </div>`;
   document.getElementById("cpClose").onclick = closePanel;
+  const cs = document.getElementById("dcSave"), cc = document.getElementById("dcClear");
+  if(cs) cs.onclick = () => saveComplaint(true, cs);
+  if(cc) cc.onclick = () => saveComplaint(false, cc);
   document.getElementById("cpSend").onclick = sendComment;
   p.querySelectorAll("[data-resolve]").forEach(b => b.onclick = () =>
     resolveComments([b.dataset.resolve], (document.getElementById("rp_"+b.dataset.resolve)||{}).value || "", b));
   p.querySelectorAll("[data-reopen]").forEach(b => b.onclick = () => resolveComments([b.dataset.reopen], "", b, true));
   p.querySelectorAll("[data-del]").forEach(b => b.onclick = () => deleteComment(b.dataset.del, b));
+}
+// The appointment details shown at the top of the drawer.
+const COMPLAINT_REASONS = ["Credit","Didn't show","Not interested","Out of area","Wrong product","Other"];
+function detailsHtml(r){
+  const kv = (k, v) => v ? `<div class="k">${k}</div><div class="v">${v}</div>` : "";
+  const appt = r[10] ? `${fmt(String(r[10]).slice(0,10))} ${clock(String(r[10]).padEnd(19,":00"))}` : "";
+  const q = qaRow(r);
+  const qaLine = (topic, label) => {
+    const quote = q && !isTransfer(r) ? (topic==="credit" ? q[2] : q[5]) : "";
+    const why = q && !isTransfer(r) ? humanize(topic==="credit" ? q[1] : q[4]) : "";
+    return `<div class="qa-line"><span class="lbl">${label}</span><div>${qaPill(r, topic)}
+      ${why && !/^(not asked|confirmed)$/i.test(why) ? `<span class="sub"> ${esc(why)}</span>` : ""}
+      ${quote ? `<div class="q">“${esc(quote)}”</div>` : ""}</div></div>`;
+  };
+  const info = ((S.data.complaint_info||{})[r[11]]) || ["",""];
+  const yes = hasComplaint(r);
+  const editor = !isAdmin() ? "" : `
+    <div class="cedit">
+      <select id="dcReason">${['<option value="">Reason…</option>'].concat(COMPLAINT_REASONS.map(x=>`<option${x===info[0]?" selected":""}>${esc(x)}</option>`)).join("")}</select>
+      <input id="dcNote" maxlength="500" placeholder="What the buyer said" value="${esc(info[1])}">
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="sbtn pri" id="dcSave">${yes ? "Save complaint" : "Flag as complaint"}</button>
+        ${yes ? '<button class="sbtn" id="dcClear">Clear complaint</button>' : ""}
+        <span class="cp-msg" id="dcMsg"></span>
+      </div>
+    </div>`;
+  return `
+    <div class="dsec"><h4>Appointment</h4><div class="dgrid">
+      ${kv("Booked", `${fmt(r[0])}${r[12] ? " · " + clock(r[12]) : ""}`)}
+      ${kv("Setter", r[1] ? esc(S.data.agents[r[1]]||r[1]) : "Unattributed")}
+      ${kv("Buyer", esc(r[2]))}
+      ${kv("Appointment", appt)}
+      ${kv("Phone", esc(r[8]||""))}
+      ${kv("Email", esc(r[9]||""))}
+      ${kv("Location", esc([r[5], r[6]].filter(Boolean).join(", ")))}
+      ${isAdmin() ? kv("Channel", channel(r)==="sms" ? "SMS" : "Call") : ""}
+      ${kv("Lead ID", esc(r[11]||""))}
+    </div></div>
+    <div class="dsec"><h4>Call QA</h4>${qaLine("credit","Credit")}${qaLine("home","Homeowner")}</div>
+    <div class="dsec"><h4>Flags</h4>
+      <div class="qa-line"><span class="lbl">Territory</span><div>${terrCell(r)}</div></div>
+      <div class="qa-line"><span class="lbl">Complaint</span><div>${complaintCell(r)}
+        ${yes && (info[0] || info[1]) ? `<div style="margin-top:4px"><b>${esc(info[0])}</b>${info[0] && info[1] ? " — " : ""}${esc(info[1])}</div>` : ""}</div></div>
+      ${editor}
+    </div>`;
+}
+async function saveComplaint(flag, btn){
+  const lead = PANEL[11], msg = document.getElementById("dcMsg");
+  const reason = (document.getElementById("dcReason")||{}).value || "";
+  const note = ((document.getElementById("dcNote")||{}).value || "").trim();
+  btn.disabled = true; if(msg) msg.textContent = "Saving…";
+  try{
+    await post("/api/complaint", flag ? { admin:"session", lead_id: lead, has_complaint: true, reason, note }
+                                      : { admin:"session", lead_id: lead, has_complaint: false });
+    S.data.complaint_info = S.data.complaint_info || {};
+    if(flag){ CMP.add(lead); S.data.complaint_info[lead] = [reason, note]; }
+    else { CMP.delete(lead); delete S.data.complaint_info[lead]; }
+    S.data.complaints = [...CMP];
+    render(); drawPanel(flag ? "Complaint saved." : "Complaint cleared.");
+  }catch(e){ btn.disabled = false; if(msg){ msg.textContent = "Didn't save: " + (e.message||e); msg.className = "cp-msg err"; } }
 }
 async function post(path, body){
   const r = await fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
@@ -1007,8 +1087,8 @@ function bulkBar(rows){
     <span class="cp-msg" id="bulkMsg"></span></div>`;
 }
 document.addEventListener("click", (e)=>{
-  const b = e.target.closest && e.target.closest(".cmt-btn[data-cmt]");
-  if(b){ e.stopPropagation(); openPanel(b.dataset.cmt); return; }
+  const b = e.target.closest && e.target.closest(".cmt-btn[data-cmt], .lead-open[data-open]");
+  if(b){ e.stopPropagation(); const id = b.dataset.cmt || b.dataset.open; if(id) openPanel(id); return; }
   const g = e.target.closest && e.target.closest("#bulkGo");
   if(g){ e.stopPropagation(); resolveComments(g.dataset.ids.split(","), (document.getElementById("bulkReply")||{}).value || "", g); }
 }, true);

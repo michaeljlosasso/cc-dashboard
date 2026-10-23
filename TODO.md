@@ -118,6 +118,12 @@
 - [x] **Complaint column** (Oct 23 2026): No by default; admin clicks to flag Yes (red).
       `leads.cc_complaint_flag`, /api/complaint. Everyone sees it; filter + export. Manual for now.
 
+- [x] **Details drawer + complaint reasons** (Oct 23 2026): click a lead name (or the comment bubble)
+      → drawer with appointment details, call QA quotes, Territory/Complaint flags (admin edits complaint
+      reason + note there), and comments. cc_complaint_flag gained `reason` (Credit, Didn't show, Not
+      interested, Out of area, Wrong product, Other); note = buyer feedback; both visible to agents.
+      Flagged 18 GES complaints from GES customer service (8 Credit, 5 Didn't show, 4 Other, 1 Not interested).
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
