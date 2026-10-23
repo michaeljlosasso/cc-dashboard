@@ -120,10 +120,11 @@ tbody tr[data-row]{cursor:pointer}
 .s-sold{color:#007e5c;background:rgba(0,181,128,.10)}
 .s-unsold{color:#8a6d00;background:rgba(255,217,0,.16)}
 /* duplicate = same phone booked twice on the same day */
-tbody tr.dup, tbody tr.oot, tbody tr.cmpl{background:rgba(244,0,112,.10)}
-tbody tr.dup:hover, tbody tr.oot:hover, tbody tr.cmpl:hover{background:rgba(244,0,112,.15)}
-/* out of territory and complaints also get a magenta edge so they read even on a dim screen */
-tbody tr.oot td:first-child, tbody tr.cmpl td:first-child{box-shadow:inset 4px 0 0 var(--ll-magenta)}
+tbody tr.dup, tbody tr.oot, tbody tr.cmpl, tbody tr.qano{background:rgba(244,0,112,.10)}
+tbody tr.dup:hover, tbody tr.oot:hover, tbody tr.cmpl:hover, tbody tr.qano:hover{background:rgba(244,0,112,.15)}
+/* out of territory, complaints and a No on Credit/Homeowner also get a magenta
+   edge so they read even on a dim screen */
+tbody tr.oot td:first-child, tbody tr.cmpl td:first-child, tbody tr.qano td:first-child{box-shadow:inset 4px 0 0 var(--ll-magenta)}
 .dup-tag{
   display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
   font-size:.68rem;font-weight:900;letter-spacing:.02em;
@@ -583,7 +584,7 @@ function tableCard(rows){
           : "Same phone booked twice this day"}">${d.n}× ${cross?"cross":"dupe"}</span>`
       : "";
     return `
-    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
+    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":"", (qaVal(r,"credit")==="no" || qaVal(r,"home")==="no")?"qano":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
