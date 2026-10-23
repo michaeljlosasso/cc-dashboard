@@ -102,6 +102,9 @@ body{
 .tbl-scroll{overflow:auto;margin:0 -18px;padding:0 18px}
 /* The log scrolls inside its own box (about a screen tall) so its column
    headers can stay pinned while you scroll down the rows. */
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:#52525b}
+th.sortable.on{color:var(--ll-purple)}
 .tbl-scroll.log{max-height:calc(100vh - 40px)}
 .tbl-scroll.log thead th{position:sticky;top:0;z-index:2;background:#fff;padding-top:10px;box-shadow:0 1px 0 #f1f2f4}
 table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
@@ -359,7 +362,7 @@ span.cmt-btn{cursor:inherit}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", sort:"booked", sortDir:"desc", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -493,12 +496,53 @@ function filtered(){
     if(S.terr && (inTerritory(r) ? "yes" : "no") !== S.terr) return false;
     if(S.cmp && (hasComplaint(r) ? "yes" : "no") !== S.cmp) return false;
     return true;
-  // Newest booking first, by the exact time it posted (r[12], Eastern).
-  }).sort((x,y)=> {
-    const a = x[12] || x[0], b = y[12] || y[0];
-    return a < b ? 1 : a > b ? -1 : 0;
-  });
+  }).sort(sorter());
 }
+
+/* ---- Sorting ----
+ * Click a column header to sort; click again to flip. Default: newest booking
+ * first by the exact time it posted (r[12], Eastern). Ties fall back to that.
+ */
+const QA_RANK = { no:0, notasked:1, unclear:2, yes:3, none:4 };   // worst first when ascending
+const SORT_KEYS = {
+  booked:    r => r[12] || r[0],
+  setter:    r => r[1] ? (S.data.agents[r[1]]||r[1]).toLowerCase() : "~",
+  lead:      r => `${r[3]||""} ${r[4]||""}`.trim().toLowerCase(),
+  credit:    r => QA_RANK[qaVal(r,"credit")],
+  home:      r => QA_RANK[qaVal(r,"home")],
+  territory: r => inTerritory(r) ? 1 : 0,
+  complaint: r => hasComplaint(r) ? 0 : 1,
+  channel:   r => channel(r),
+  phone:     r => String(r[8]||"").replace(/\D/g,""),
+  email:     r => String(r[9]||"").toLowerCase() || "~",
+  campaign:  r => String(r[2]||"").toLowerCase(),
+  location:  r => `${r[6]||""} ${r[5]||""}`.trim().toLowerCase() || "~",
+};
+function sorter(){
+  const key = SORT_KEYS[S.sort] || SORT_KEYS.booked;
+  const dir = S.sortDir === "asc" ? 1 : -1;
+  const when = SORT_KEYS.booked;
+  return (x, y) => {
+    const a = key(x), b = key(y);
+    if(a < b) return -dir;
+    if(a > b) return dir;
+    const ta = when(x), tb = when(y);            // tie-break: newest first
+    return ta < tb ? 1 : ta > tb ? -1 : 0;
+  };
+}
+function th(label, key){
+  const on = (S.sort || "booked") === key;
+  const arrow = on ? (S.sortDir === "asc" ? " ▲" : " ▼") : "";
+  return `<th class="sortable${on ? " on" : ""}" data-sort="${key}" title="Sort by ${label}">${label}${arrow}</th>`;
+}
+document.addEventListener("click", (e)=>{
+  const h = e.target.closest && e.target.closest("th[data-sort]");
+  if(!h) return;
+  const k = h.dataset.sort;
+  if((S.sort || "booked") === k) S.sortDir = S.sortDir === "asc" ? "desc" : "asc";
+  else { S.sort = k; S.sortDir = k === "booked" ? "desc" : "asc"; }
+  S.page = 1; render();
+});
 
 function render(){
   const c = document.getElementById("content");
@@ -619,7 +663,7 @@ function tableCard(rows){
 
     <div class="tbl-scroll log" style="margin-top:14px">
     <table>
-      <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Territory</th><th>Complaint</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
+      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${isAdmin()?th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
       <tbody>${body || `<tr><td colspan="${isAdmin()?12:11}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
