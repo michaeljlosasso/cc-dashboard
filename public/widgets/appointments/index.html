@@ -175,6 +175,48 @@ tbody tr:hover .qa-pen{opacity:1}
 }
 #qaMenu .msg{font-size:.78rem;font-weight:800;margin-top:8px;color:var(--muted)}
 #qaMenu .msg.err{color:#b90053}
+/* comments */
+.cmt-btn{
+  display:inline-flex;align-items:center;gap:3px;margin-left:7px;border:0;cursor:pointer;
+  border-radius:999px;padding:2px 7px;font-family:"Nunito",sans-serif;font-size:.68rem;font-weight:900;
+  color:#a1a1aa;background:transparent;vertical-align:1px;
+}
+.cmt-btn:hover{color:#8a56f3;background:#f4f4f5}
+.cmt-btn.has{color:#52525b;background:#f4f4f5}
+.cmt-btn.open{color:#fff;background:var(--ll-purple)}
+#cmtPanel{
+  position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);z-index:120;display:none;flex-direction:column;
+  background:#fff;border-left:1px solid var(--ll-border);box-shadow:-18px 0 48px rgba(25,23,24,.14);
+}
+#cmtPanel.open{display:flex}
+.cp-head{padding:18px 18px 12px;border-bottom:1px solid #f1f2f4}
+.cp-head h3{margin:0;font-size:1.02rem;font-weight:900}
+.cp-head .sub{margin-top:3px}
+.cp-close{position:absolute;top:12px;right:12px;border:0;background:#f4f4f5;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem;font-weight:900;color:#52525b}
+.cp-list{flex:1;overflow:auto;padding:12px 18px;display:flex;flex-direction:column;gap:10px}
+.cp-empty{color:var(--muted);font-weight:700;font-size:.86rem;padding:10px 0}
+.cmt{border:1px solid #eef0f2;border-radius:12px;padding:10px 12px;background:#fafafa}
+.cmt.resolved{background:#fff;opacity:.85}
+.cmt-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.72rem;font-weight:800;color:var(--muted)}
+.topic{border-radius:999px;padding:2px 8px;font-size:.68rem;font-weight:900;color:#5b3fb0;background:rgba(138,86,243,.12)}
+.st{border-radius:999px;padding:2px 8px;font-size:.68rem;font-weight:900}
+.st.open{color:#8a6d00;background:rgba(255,217,0,.22)}
+.st.resolved{color:#007e5c;background:rgba(0,181,128,.12)}
+.cmt-body{margin-top:6px;font-size:.88rem;font-weight:700;white-space:pre-wrap;word-wrap:break-word}
+.cmt-reply{margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(0,181,128,.07);font-size:.84rem;font-weight:700;white-space:pre-wrap}
+.cmt-reply b{color:#007e5c}
+.cmt-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.cmt-actions input{flex:1;min-width:140px;border:1px solid var(--ll-border);border-radius:8px;padding:6px 8px;font-family:"Nunito";font-size:.8rem;font-weight:700}
+.sbtn{border:1px solid var(--ll-border);background:#fff;border-radius:8px;padding:6px 10px;font-family:"Nunito";font-weight:850;font-size:.78rem;cursor:pointer;color:var(--ll-black)}
+.sbtn.pri{background:var(--ll-purple);border-color:var(--ll-purple);color:#fff}
+.sbtn:disabled{opacity:.5;cursor:wait}
+.cp-form{border-top:1px solid #f1f2f4;padding:12px 18px 18px;display:flex;flex-direction:column;gap:8px}
+.cp-form select,.cp-form textarea{border:1px solid var(--ll-border);border-radius:10px;padding:8px 10px;font-family:"Nunito";font-size:.86rem;font-weight:700}
+.cp-form textarea{min-height:80px;resize:vertical}
+.cp-msg{font-size:.78rem;font-weight:800;color:var(--muted)}
+.cp-msg.err{color:#b90053}
+.bulkbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(138,86,243,.06);font-size:.82rem;font-weight:800}
+.bulkbar input{flex:1;min-width:200px;border:1px solid var(--ll-border);border-radius:8px;padding:6px 9px;font-family:"Nunito";font-weight:700;font-size:.82rem}
 #qaTip{
   position:fixed;z-index:100;display:none;max-width:340px;pointer-events:none;
   background:#191718;color:#fff;border-radius:10px;padding:10px 12px;
@@ -256,6 +298,13 @@ tbody tr:hover .qa-pen{opacity:1}
       <div class="pop" id="hoPop"><div class="pop-list" id="hoList"></div></div>
     </div>
     <div class="pop-wrap">
+      <button class="filter-control" id="cmBtn" aria-expanded="false">
+        <span id="cmLabel">Comments: All</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="cmPop"><div class="pop-list" id="cmList"></div></div>
+    </div>
+    <div class="pop-wrap">
       <button class="filter-control" id="trBtn" aria-expanded="false">
         <span id="trLabel">Territory: All</span>
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -275,13 +324,14 @@ tbody tr:hover .qa-pen{opacity:1}
 </div>
 <div id="qaTip"></div>
 <div id="qaMenu"></div>
+<div id="cmtPanel" role="dialog" aria-label="Comments"></div>
 
 <script>
 "use strict";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -319,7 +369,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory();
+    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComments();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -393,8 +443,11 @@ function buildDupFilter(){
 
 function filtered(){
   const a = S.week, b = iso(addDays(parse(S.week),6));
+  // Reviewing open comments spans every week — old ones can still come in.
+  const allWeeks = S.cm.startsWith("open");
   return S.data.appts.filter(r =>{
-    if(r[0] < a || r[0] > b) return false;
+    if(!allWeeks && (r[0] < a || r[0] > b)) return false;
+    if(S.cm && !cmMatch(r)) return false;
     if(S.agent && r[1] !== S.agent) return false;
     if(S.dup){
       const d = dupOf(r);
@@ -490,7 +543,7 @@ function tableCard(rows){
     <tr class="${[d?"dup":"", inTerritory(r)?"":"oot"].join(" ").trim()}">
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td>${esc(r[3])} ${esc(r[4])}${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}</td>
+      <td>${esc(r[3])} ${esc(r[4])}${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>${isAdmin()?`
@@ -505,7 +558,7 @@ function tableCard(rows){
   return `<div class="card">
     <div class="card-top"><div>
     <div class="eyebrow">Appointment Log</div>
-    <h2 class="card-h">Every Appointment — Week of ${fmt(S.week)}</h2>
+    <h2 class="card-h">${S.cm.startsWith("open") ? "Open Comments — all weeks" : `Every Appointment — Week of ${fmt(S.week)}`}</h2>
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
       dupNote(rows)}${ootNote(rows)}</p>
     </div>
@@ -513,6 +566,7 @@ function tableCard(rows){
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       Export CSV
     </button></div>
+    ${bulkBar(rows)}
     <div class="qa-legend">Credit &amp; Homeowner, from the call recording:
       <span class="qa yes">Yes</span>
       <span class="qa no">No</span>
@@ -542,12 +596,13 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
     const q = isTransfer(r) ? null : qaRow(r), d = dupOf(r);
     lines.push([
+      commentsOf(r).map(c => `[${c[2]}${c[5]==="resolved"?" · resolved":""}] ${c[3]}${c[6] ? ` → ${c[6]}` : ""}`).join(" | "),
       r[0], r[12] ? String(r[12]).slice(11,16) : "", r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
       label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
@@ -563,6 +618,7 @@ function exportCsv(rows){
   if(S.dup) parts.push(S.dup==="cross" ? "cross-dupes" : "dupes");
   if(S.ch) parts.push(S.ch);
   if(S.terr) parts.push("territory-" + S.terr);
+  if(S.cm) parts.push("comments-" + S.cm);
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -728,6 +784,153 @@ document.addEventListener("click", (e)=>{
   if(b && !b.disabled){ e.stopPropagation(); toggleTerritory(b); }
 }, true);
 
+/* ---- Comments ----
+ * S.data.comments rows: [id, lead_id, topic, body, author_role, status, reply,
+ *   created_at, resolved_at, setter_user]. Anyone logged in can add one; the
+ * admin login resolves them (bulk too) with an optional reply. Never locked.
+ */
+const TOPICS = ["Credit","Homeowner","Territory","Customer","Other"];
+let CMT = new Map();          // lead_id -> [comment rows], oldest first
+function buildComments(){
+  CMT = new Map();
+  for(const c of (S.data.comments||[])){
+    if(!CMT.has(c[1])) CMT.set(c[1], []);
+    CMT.get(c[1]).push(c);
+  }
+  const opts = [["","All"],["open","Open (all topics)"],...TOPICS.map(t=>["open:"+t,"Open · "+t]),["any","Has comments"]];
+  const list = document.getElementById("cmList");
+  list.innerHTML = opts.map(([v,n])=>`<div class="pop-item${v===S.cm?" on":""}" data-v="${v}">${n}</div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.cm = el.dataset.v; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.cm));
+      document.getElementById("cmLabel").textContent = "Comments: " + ((opts.find(o=>o[0]===S.cm)||opts[0])[1]);
+      closePops(); render();
+    };
+  });
+}
+const commentsOf = r => CMT.get(r[11]) || [];
+const openOf = r => commentsOf(r).filter(c => c[5] !== "resolved");
+function cmMatch(r){
+  if(S.cm === "any") return commentsOf(r).length > 0;
+  if(S.cm === "open") return openOf(r).length > 0;
+  if(S.cm.startsWith("open:")) return openOf(r).some(c => c[2] === S.cm.slice(5));
+  return true;
+}
+function cmtBtn(r){
+  if(!r[11]) return "";
+  const all = commentsOf(r).length, open = openOf(r).length;
+  const cls = open ? "open" : all ? "has" : "";
+  const label = all ? `${all}` : "+";
+  const tip = open ? `${open} open comment${open>1?"s":""}` : all ? `${all} comment${all>1?"s":""}, all resolved` : "Add a comment";
+  return `<button class="cmt-btn ${cls}" data-cmt="${esc(r[11])}" title="${tip}">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${label}</button>`;
+}
+const when = iso => { if(!iso) return ""; const d = new Date(iso);
+  return d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); };
+let PANEL = null;             // the appointment row the panel is showing
+function openPanel(lead){
+  const r = S.data.appts.find(x => x[11] === lead); if(!r) return;
+  PANEL = r; drawPanel(); document.getElementById("cmtPanel").classList.add("open");
+}
+function closePanel(){ PANEL = null; document.getElementById("cmtPanel").classList.remove("open"); }
+function drawPanel(msg, isErr){
+  const r = PANEL; if(!r) return;
+  const p = document.getElementById("cmtPanel");
+  const list = commentsOf(r).map(c => `
+    <div class="cmt ${c[5]==="resolved"?"resolved":""}">
+      <div class="cmt-meta"><span class="topic">${esc(c[2])}</span>
+        <span class="st ${c[5]==="resolved"?"resolved":"open"}">${c[5]==="resolved"?"Resolved":"Open"}</span>
+        <span>${c[4]==="admin" ? "Manny" : esc((S.data.agents||{})[c[9]] || "Agent")} · ${when(c[7])}</span></div>
+      <div class="cmt-body">${esc(c[3])}</div>
+      ${c[6] ? `<div class="cmt-reply"><b>Manny:</b> ${esc(c[6])}</div>` : ""}
+      ${isAdmin() ? `<div class="cmt-actions">${c[5]==="resolved"
+        ? `<button class="sbtn" data-reopen="${esc(c[0])}">Reopen</button>`
+        : `<input id="rp_${esc(c[0])}" maxlength="500" placeholder="Reply (optional)"><button class="sbtn pri" data-resolve="${esc(c[0])}">Resolve</button>`}
+        <button class="sbtn" data-del="${esc(c[0])}" title="Delete this comment">Delete</button></div>` : ""}
+    </div>`).join("");
+  p.innerHTML = `
+    <div class="cp-head" style="position:relative">
+      <h3>${esc(r[3])} ${esc(r[4])}</h3>
+      <div class="sub">${fmt(r[0])} · ${r[1] ? esc(S.data.agents[r[1]]||r[1]) : "Unattributed"} · ${esc(r[2])}</div>
+      <button class="cp-close" id="cpClose" title="Close">×</button>
+    </div>
+    <div class="cp-list">${list || '<div class="cp-empty">No comments yet.</div>'}</div>
+    <div class="cp-form">
+      <select id="cpTopic">${TOPICS.map(t=>`<option>${t}</option>`).join("")}</select>
+      <textarea id="cpBody" maxlength="1000" placeholder="What should Manny know about this appointment?"></textarea>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="sbtn pri" id="cpSend">Add comment</button>
+        <span class="cp-msg${isErr?" err":""}" id="cpMsg">${msg ? esc(msg) : ""}</span>
+      </div>
+    </div>`;
+  document.getElementById("cpClose").onclick = closePanel;
+  document.getElementById("cpSend").onclick = sendComment;
+  p.querySelectorAll("[data-resolve]").forEach(b => b.onclick = () =>
+    resolveComments([b.dataset.resolve], (document.getElementById("rp_"+b.dataset.resolve)||{}).value || "", b));
+  p.querySelectorAll("[data-reopen]").forEach(b => b.onclick = () => resolveComments([b.dataset.reopen], "", b, true));
+  p.querySelectorAll("[data-del]").forEach(b => b.onclick = () => deleteComment(b.dataset.del, b));
+}
+async function post(path, body){
+  const r = await fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+// After a save, mirror it locally (no full reload — that takes seconds and
+// would let a second comment typed meanwhile get wiped). The server already
+// cleared its cache, so the next page load shows the same thing.
+function localComments(fn){ S.data.comments = fn(S.data.comments || []); buildComments(); }
+async function sendComment(){
+  const btn = document.getElementById("cpSend");
+  const body = document.getElementById("cpBody").value.trim();
+  const topic = document.getElementById("cpTopic").value;
+  if(!body){ drawPanel("Write a comment first.", true); return; }
+  btn.disabled = true; document.getElementById("cpMsg").textContent = "Saving…";
+  try{
+    const j = await post("/api/comment", { lead_id: PANEL[11], topic, body, setter_user: PANEL[1] || "" });
+    localComments(cs => cs.concat([[j.id, PANEL[11], topic, body, isAdmin() ? "admin" : "agent", "open", "",
+      new Date().toISOString(), "", PANEL[1] || ""]]));
+    render(); drawPanel("Saved.");
+  }catch(e){ btn.disabled = false; document.getElementById("cpMsg").textContent = "Didn't save: " + (e.message||e);
+    document.getElementById("cpMsg").className = "cp-msg err"; }
+}
+async function resolveComments(ids, reply, btn, reopen){
+  if(btn) btn.disabled = true;
+  try{
+    await post("/api/comment/resolve", { admin:"session", ids, reply, status: reopen ? "open" : "resolved" });
+    const set = new Set(ids), now = new Date().toISOString(), rp = String(reply||"").trim();
+    localComments(cs => cs.map(c => !set.has(c[0]) ? c : reopen
+      ? [c[0],c[1],c[2],c[3],c[4],"open",c[6],c[7],"",c[9]]
+      : [c[0],c[1],c[2],c[3],c[4],"resolved",rp || c[6],c[7],now,c[9]]));
+    render(); if(PANEL) drawPanel(reopen ? "Reopened." : `Resolved ${ids.length}.`);
+  }catch(e){ if(btn) btn.disabled = false; if(PANEL) drawPanel("Didn't save: " + (e.message||e), true);
+    else { const m = document.getElementById("bulkMsg"); if(m) m.textContent = "Didn't save: " + (e.message||e); } }
+}
+async function deleteComment(id, btn){
+  btn.disabled = true;
+  try{ await post("/api/comment/delete", { admin:"session", id }); localComments(cs => cs.filter(c => c[0] !== id)); render(); drawPanel("Deleted."); }
+  catch(e){ btn.disabled = false; drawPanel("Didn't delete: " + (e.message||e), true); }
+}
+// Admin: resolve every open comment in the current filtered view at once.
+function bulkBar(rows){
+  if(!isAdmin() || !S.cm.startsWith("open")) return "";
+  const topic = S.cm.startsWith("open:") ? S.cm.slice(5) : "";
+  const ids = rows.flatMap(r => openOf(r).filter(c => !topic || c[2] === topic).map(c => c[0]));
+  if(!ids.length) return "";
+  return `<div class="bulkbar"><span>${ids.length} open comment${ids.length>1?"s":""} shown</span>
+    <input id="bulkReply" maxlength="500" placeholder="One reply for all (optional), e.g. Reviewed, no change">
+    <button class="sbtn pri" id="bulkGo" data-ids="${ids.join(",")}">Resolve all shown</button>
+    <span class="cp-msg" id="bulkMsg"></span></div>`;
+}
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest && e.target.closest(".cmt-btn[data-cmt]");
+  if(b){ e.stopPropagation(); openPanel(b.dataset.cmt); return; }
+  const g = e.target.closest && e.target.closest("#bulkGo");
+  if(g){ e.stopPropagation(); resolveComments(g.dataset.ids.split(","), (document.getElementById("bulkReply")||{}).value || "", g); }
+}, true);
+document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closePanel(); });
+
 // Appointments Manny added by hand (leads.cc_appt_manual) carry a MANUAL id.
 const isManual = r => /^MANUAL/.test(String(r[11]||""));
 
@@ -820,7 +1023,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"],["cmBtn","cmPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();

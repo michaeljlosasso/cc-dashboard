@@ -461,6 +461,21 @@ SELECT FORMAT_DATETIME('%Y-%m-%d', booked_at) AS booked_date, agent_user,
 FROM \`${PROJECT}.leads.cc_appt_manual\`
 `;
 
+// Appointment comments (Manny, Oct 23 2026): agents and Manny leave notes on
+// any appointment; Manny resolves them (with an optional reply), in bulk if he
+// likes. Several per appointment; never locked. Everyone sees them.
+const COMMENT_TOPICS = ["Credit", "Homeowner", "Territory", "Customer", "Other"];
+const SQL_COMMENTS = `
+SELECT id, lead_id, IFNULL(topic,'Other') AS topic, IFNULL(body,'') AS body,
+       IFNULL(author_role,'agent') AS author_role, IFNULL(status,'open') AS status,
+       IFNULL(reply,'') AS reply,
+       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at,
+       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', resolved_at) AS resolved_at,
+       IFNULL(setter_user,'') AS setter_user
+FROM \`${PROJECT}.leads.cc_appt_comments\`
+ORDER BY created_at
+`;
+
 // Territory (Manny, Oct 20 2026): every appointment is in territory unless he
 // flags it out from the admin view. Display only — never changes pay.
 const SQL_TERRITORY = `
@@ -596,7 +611,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -611,6 +626,7 @@ async function buildPayload(env, admin) {
     admin ? bq(env, SQL_SPIFF_TYPES).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
     bq(env, SQL_TERRITORY).catch(() => ({ rows: [] })),
     bq(env, SQL_APPT_MANUAL).catch(() => ({ rows: [] })),
+    bq(env, SQL_COMMENTS).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -668,6 +684,8 @@ async function buildPayload(env, admin) {
       if (note) (m[id] = m[id] || {})[topic] = note;
       return m;
     }, {}) } : {}),
+    // [id, lead_id, topic, body, author_role, status, reply, created_at, resolved_at, setter_user]
+    comments: comments.rows,
     // Lead IDs flagged out of territory (everyone sees the flag; note is admin-only).
     out_territory: territory.rows.map((r) => r[0]),
     ...(admin ? { out_territory_note: Object.fromEntries(territory.rows.filter((r) => r[1]).map((r) => [r[0], r[1]])) } : {}),
@@ -974,6 +992,36 @@ async function handleAdmin(request, env, url, adminSess) {
     return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
   }
 
+  /* Resolve / reopen comments, one or many, with an optional reply (admin). */
+  if (url.pathname === "/api/comment/resolve") {
+    const ids = Array.isArray(body.ids) ? body.ids.map(String) : [];
+    if (!ids.length || ids.length > 500) throw new Error("pick 1–500 comments");
+    if (!ids.every((x) => /^[0-9a-f-]{36}$/.test(x))) throw new Error("bad comment id");
+    const reopen = body.status === "open";
+    const list = ids.map((x) => `'${x}'`).join(",");
+    await bq(env, reopen ? `
+      UPDATE \`${PROJECT}.leads.cc_appt_comments\`
+      SET status = 'open', resolved_at = NULL
+      WHERE id IN (${list})
+    ` : `
+      UPDATE \`${PROJECT}.leads.cc_appt_comments\`
+      SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP(),
+          reply = ${String(body.reply || "").trim() ? sqlStr(String(body.reply).trim(), 500) : "reply"}
+      WHERE id IN (${list})
+    `);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true, count: ids.length }), { headers: JSON_HEADERS });
+  }
+
+  /* Delete a comment (admin) — for junk or test notes. */
+  if (url.pathname === "/api/comment/delete") {
+    const id = String(body.id || "");
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("bad comment id");
+    await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_appt_comments\` WHERE id = '${id}'`);
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
   if (url.pathname === "/api/hours-adjust/delete") {
     const user = String(body.user || "");
     const date = String(body.work_date || "");
@@ -1137,11 +1185,46 @@ export default {
       }
     }
 
+    /* ---- appointment comments: any logged-in user may add one ----
+     * The only write agents can make. Tagged agent/admin by the login used,
+     * and with the row's setter so Manny knows whose appointment it is. */
+    if (path === "/api/comment" && request.method === "POST") {
+      if (!authed) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
+      }
+      try {
+        let b = {};
+        try { b = await request.json(); } catch (_) {}
+        const id = String(b.lead_id || "");
+        const topic = String(b.topic || "");
+        const text = String(b.body || "").trim();
+        const setter = String(b.setter_user || "");
+        if (!/^[A-Za-z0-9]{6,16}$/.test(id)) throw new Error("bad appointment");
+        if (!COMMENT_TOPICS.includes(topic)) throw new Error("pick a topic");
+        if (!text) throw new Error("write a comment first");
+        if (text.length > 1000) throw new Error("keep it under 1,000 characters");
+        if (setter && !/^20[0-9]{2}$/.test(setter)) throw new Error("bad setter");
+        const cid = crypto.randomUUID();
+        await bq(env, `
+          INSERT INTO \`${PROJECT}.leads.cc_appt_comments\`
+            (id, lead_id, topic, body, author_role, setter_user, status, reply, created_at)
+          VALUES ('${cid}', '${id}', '${topic}', ${sqlStr(text, 1000)}, '${adminSess ? "admin" : "agent"}',
+                  ${setter ? `'${setter}'` : "NULL"}, 'open', NULL, CURRENT_TIMESTAMP())
+        `);
+        await bustDataCache(url);
+        return new Response(JSON.stringify({ ok: true, id: cid }), { headers: JSON_HEADERS });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err && err.message ? err.message : err) }),
+          { status: 400, headers: JSON_HEADERS });
+      }
+    }
+
     /* ---- admin (spiffs + config) ---- */
     if ((path === "/api/spiff" || path === "/api/spiff/delete" || path === "/api/config"
          || path === "/api/spiff-window" || path === "/api/spiff-window/delete"
          || path === "/api/hours-adjust" || path === "/api/hours-adjust/delete"
          || path === "/api/qa-override" || path === "/api/territory"
+         || path === "/api/comment/resolve" || path === "/api/comment/delete"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });

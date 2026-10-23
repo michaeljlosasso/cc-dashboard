@@ -109,6 +109,12 @@
       booking (set, sits, spiffs), tagged "Manual" on Appointments. No UI yet; insert a row.
       First: MANUAL0001 Ryon Hayman / Onsite Energy, Jon, Oct 21 5:13 PM, campaign "LL Media".
 
+- [x] **Appointment comments** (Oct 23 2026): bubble on every row → side panel. Anyone logged in adds
+      comments (topic: Credit/Homeowner/Territory/Customer/Other), several per row, never locked —
+      /api/comment is the ONLY agent write. Admin: Resolve/Reopen with reply, Delete, and
+      "Comments: Open…" filter (spans all weeks) with "Resolve all shown" + one reply. Table
+      `leads.cc_appt_comments`. Export has a Comments column. Saves update locally (no reload).
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)
