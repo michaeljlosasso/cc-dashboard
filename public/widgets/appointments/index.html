@@ -114,8 +114,10 @@ tbody tr:hover{background:#fafafa}
 .s-sold{color:#007e5c;background:rgba(0,181,128,.10)}
 .s-unsold{color:#8a6d00;background:rgba(255,217,0,.16)}
 /* duplicate = same phone booked twice on the same day */
-tbody tr.dup, tbody tr.oot{background:rgba(244,0,112,.055)}
-tbody tr.dup:hover, tbody tr.oot:hover{background:rgba(244,0,112,.09)}
+tbody tr.dup, tbody tr.oot{background:rgba(244,0,112,.10)}
+tbody tr.dup:hover, tbody tr.oot:hover{background:rgba(244,0,112,.15)}
+/* out of territory also gets a magenta edge so it reads even on a dim screen */
+tbody tr.oot td:first-child{box-shadow:inset 4px 0 0 var(--ll-magenta)}
 .dup-tag{
   display:inline-block;margin-left:7px;border-radius:999px;padding:2px 8px;
   font-size:.68rem;font-weight:900;letter-spacing:.02em;
@@ -407,7 +409,12 @@ function buildWeeks(){
 
 function buildAgents(){
   const list = document.getElementById("agList");
-  const opts = [["","All Agents"], ...Object.entries(S.data.agents)];
+  // Only agents who booked something in the last 60 days, so people who've
+  // left (Horacio, David) drop off by themselves. Their old bookings still
+  // show under All Agents.
+  const since = iso(addDays(new Date(), -60));
+  const active = new Set(S.data.appts.filter(r => r[1] && r[0] >= since).map(r => r[1]));
+  const opts = [["","All Agents"], ...Object.entries(S.data.agents).filter(([u]) => active.has(u) || u === S.agent)];
   list.innerHTML = opts.map(([u,n])=>`
     <div class="pop-item${u===S.agent?" on":""}" data-u="${esc(u)}">${esc(n)}</div>`).join("");
   list.querySelectorAll(".pop-item").forEach(el=>{
