@@ -599,21 +599,19 @@ function tableCard(rows){
     <div class="card-top"><div>
     <div class="eyebrow">Appointment Log</div>
     <h2 class="card-h">${S.cm.startsWith("open") ? "Open Comments — all weeks" : `Every Appointment — Week of ${fmt(S.week)}`}</h2>
-    <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
-      dupNote(rows)}</p>
+    ${(() => {
+      // Counts live in the tiles; this line only names the agent filter and
+      // flags duplicates (no tile for those). Hidden when there's nothing to say.
+      const bits = (S.agent ? esc(S.data.agents[S.agent]||S.agent) : "") + dupNote(rows);
+      return bits ? `<p class="card-sub">${bits.replace(/^ · /, "")}</p>` : "";
+    })()}
     </div>
     <button class="export-btn" id="exportBtn" ${rows.length?"":"disabled"} title="Download every row in this view (all pages) as a CSV">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       Export CSV
     </button></div>
     ${bulkBar(rows)}
-    <div class="qa-legend">Credit &amp; Homeowner, from the call recording:
-      <span class="qa yes">Yes</span>
-      <span class="qa no">No</span>
-      <span class="qa unclear">Unclear</span>
-      <span class="qa notasked">Not Asked</span>
-      <span class="qa none">—</span> not scored yet or transfer · hover a pill for the quote
-    </div>
+
     <div class="tbl-scroll" style="margin-top:14px">
     <table>
       <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Territory</th><th>Complaint</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
