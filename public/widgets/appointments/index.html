@@ -108,6 +108,7 @@ thead th{
 thead th.r, td.r{text-align:right}
 tbody td{padding:10px 9px;border-top:1px solid #f1f2f4;white-space:nowrap}
 tbody tr:hover{background:#fafafa}
+tbody tr[data-row]{cursor:pointer}
 .mono{font-variant-numeric:tabular-nums}
 .sub{color:var(--muted);font-weight:700;font-size:.78rem}
 .agent-name{font-weight:850}
@@ -184,7 +185,7 @@ tbody tr:hover .qa-pen{opacity:1}
   border-radius:999px;padding:2px 7px;font-family:"Nunito",sans-serif;font-size:.68rem;font-weight:900;
   color:#a1a1aa;background:transparent;vertical-align:1px;
 }
-.cmt-btn:hover{color:#8a56f3;background:#f4f4f5}
+span.cmt-btn{cursor:inherit}
 .cmt-btn.has{color:#52525b;background:#f4f4f5}
 .cmt-btn.open{color:#fff;background:var(--ll-purple)}
 #cmtPanel{
@@ -578,10 +579,10 @@ function tableCard(rows){
           : "Same phone booked twice this day"}">${d.n}× ${cross?"cross":"dupe"}</span>`
       : "";
     return `
-    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":""].join(" ").trim()}">
+    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td><button class="lead-open" data-open="${esc(r[11]||"")}" title="Open details">${esc(r[3])} ${esc(r[4])}</button>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
+      <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>
@@ -917,12 +918,14 @@ function cmMatch(r){
 }
 function cmtBtn(r){
   if(!r[11]) return "";
+  // Just an indicator now — clicking anywhere on the row opens the drawer,
+  // where comments live. Shown only when there are comments.
   const all = commentsOf(r).length, open = openOf(r).length;
-  const cls = open ? "open" : all ? "has" : "";
-  const label = all ? `${all}` : "+";
-  const tip = open ? `${open} open comment${open>1?"s":""}` : all ? `${all} comment${all>1?"s":""}, all resolved` : "Add a comment";
-  return `<button class="cmt-btn ${cls}" data-cmt="${esc(r[11])}" title="${tip}">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${label}</button>`;
+  if(!all) return "";
+  const cls = open ? "open" : "has";
+  const tip = open ? `${open} open comment${open>1?"s":""}` : `${all} comment${all>1?"s":""}, all resolved`;
+  return `<span class="cmt-btn ${cls}" title="${tip}">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${all}</span>`;
 }
 const when = iso => { if(!iso) return ""; const d = new Date(iso);
   return d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); };
@@ -1088,8 +1091,15 @@ function bulkBar(rows){
     <span class="cp-msg" id="bulkMsg"></span></div>`;
 }
 document.addEventListener("click", (e)=>{
-  const b = e.target.closest && e.target.closest(".cmt-btn[data-cmt], .lead-open[data-open]");
-  if(b){ e.stopPropagation(); const id = b.dataset.cmt || b.dataset.open; if(id) openPanel(id); return; }
+  const row = e.target.closest && e.target.closest("tbody tr[data-row]");
+  if(row){
+    // Controls in the row keep doing their own thing (pencil, territory,
+    // complaint, links), and dragging to copy a phone/email never opens it.
+    if(e.target.closest("button, a, input, select, textarea")) return;
+    const sel = window.getSelection && String(window.getSelection());
+    if(sel && sel.trim()) return;
+    e.stopPropagation(); openPanel(row.dataset.row); return;
+  }
   const g = e.target.closest && e.target.closest("#bulkGo");
   if(g){ e.stopPropagation(); resolveComments(g.dataset.ids.split(","), (document.getElementById("bulkReply")||{}).value || "", g); }
 }, true);
