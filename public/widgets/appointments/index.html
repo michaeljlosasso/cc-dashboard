@@ -24,7 +24,8 @@ body{
     linear-gradient(180deg,#fff 0%, #f9fafb 34%, #f6f7f8 100%);
   min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:1440px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+/* Full width: the log is wide, so use the whole frame instead of a centered 1440px column. */
+.wrap{max-width:none;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .card{
   border:1px solid rgba(229,231,235,.92); background:rgba(255,255,255,.94);
@@ -102,10 +103,10 @@ body{
 table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
 thead th{
   text-align:left;font-size:.7rem;font-weight:900;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--dim);padding:0 12px 10px;white-space:nowrap;
+  text-transform:uppercase;color:var(--dim);padding:0 9px 10px;white-space:nowrap;
 }
 thead th.r, td.r{text-align:right}
-tbody td{padding:11px 12px;border-top:1px solid #f1f2f4;white-space:nowrap}
+tbody td{padding:10px 9px;border-top:1px solid #f1f2f4;white-space:nowrap}
 tbody tr:hover{background:#fafafa}
 .mono{font-variant-numeric:tabular-nums}
 .sub{color:var(--muted);font-weight:700;font-size:.78rem}
