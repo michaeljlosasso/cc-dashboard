@@ -299,7 +299,7 @@ tbody tr:hover .qa-pen{opacity:1}
       </button>
       <div class="pop" id="hoPop"><div class="pop-list" id="hoList"></div></div>
     </div>
-    <div class="pop-wrap">
+    <div class="pop-wrap" id="cmWrap" style="display:none">
       <button class="filter-control" id="cmBtn" aria-expanded="false">
         <span id="cmLabel">Comments: All</span>
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -371,7 +371,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComments();
+    buildDupes(); buildWeeks(); buildAgents(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComments(); showCommentFilter();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -816,6 +816,9 @@ function buildComments(){
     };
   });
 }
+// The Comments filter is admin-only — it's how Manny batch-reviews open
+// comments. Agents just use the bubble on each row.
+function showCommentFilter(){ const w = document.getElementById("cmWrap"); if(w) w.style.display = isAdmin() ? "" : "none"; }
 const commentsOf = r => CMT.get(r[11]) || [];
 const openOf = r => commentsOf(r).filter(c => c[5] !== "resolved");
 function cmMatch(r){
