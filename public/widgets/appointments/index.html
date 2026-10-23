@@ -1114,6 +1114,8 @@ const isManual = r => /^MANUAL/.test(String(r[11]||""));
 function reviewTag(r){
   const q = (S.data.appt_qa||{})[r[11]];
   if(!q || !q[6] || isTransfer(r)) return "";
+  // Once Manny has corrected a pill on this appointment, it's been reviewed.
+  if(Object.keys((S.data.qa_edit||{})[r[11]] || {}).length) return "";
   return `<span class="rv-tag" data-tip-h="Flagged for review" data-tip-w="${esc(humanize(q[7]))}" data-tip-q="">Review</span>`;
 }
 (function wireTip(){
