@@ -600,7 +600,7 @@ function tableCard(rows){
     <div class="eyebrow">Appointment Log</div>
     <h2 class="card-h">${S.cm.startsWith("open") ? "Open Comments — all weeks" : `Every Appointment — Week of ${fmt(S.week)}`}</h2>
     <p class="card-sub">${rows.length} appointment${rows.length===1?"":"s"}${S.agent?` · ${esc(S.data.agents[S.agent]||S.agent)}`:""}${
-      dupNote(rows)}${ootNote(rows)}</p>
+      dupNote(rows)}</p>
     </div>
     <button class="export-btn" id="exportBtn" ${rows.length?"":"disabled"} title="Download every row in this view (all pages) as a CSV">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
