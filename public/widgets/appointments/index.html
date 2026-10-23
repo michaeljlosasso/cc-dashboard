@@ -486,7 +486,7 @@ function render(){
   const c = document.getElementById("content");
   if(S.err){ c.innerHTML = `<div class="err"><strong>Couldn't load appointments.</strong><br>${esc(S.err)}</div>`; return; }
   if(!S.data){
-    c.innerHTML = `<div class="kpi-row">${'<div class="card skel" style="height:150px"></div>'.repeat(3)}</div>
+    c.innerHTML = `<div class="kpi-row">${'<div class="card skel" style="height:150px"></div>'.repeat(4)}</div>
       <div class="card skel" style="height:300px;margin-top:14px"></div>`;
     return;
   }
@@ -524,6 +524,15 @@ function kpis(rows){
       return tile("c-red", ic('<circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/>'),
         "Out of Territory", oot.toLocaleString(),
         oot ? `${pct}% of appointments this week` : "none this week");
+    })()}
+    ${(() => {
+      // Customer complaints in the selected view. Amber, so it reads as a
+      // second watch item without blending into the red territory tile.
+      const n = rows.filter(r => hasComplaint(r)).length;
+      const pct = total ? Math.round(n / total * 100) : 0;
+      return tile("c-yellow", ic('<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>'),
+        "Complaints", n.toLocaleString(),
+        n ? `${pct}% of appointments this week` : "none this week");
     })()}
   </div>`;
 }
