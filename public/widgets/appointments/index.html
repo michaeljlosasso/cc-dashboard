@@ -100,6 +100,10 @@ body{
 .c-purple{color:var(--ll-purple)} .c-yellow{color:#d09f00}
 .c-red{color:var(--ll-magenta)}
 .tbl-scroll{overflow:auto;margin:0 -18px;padding:0 18px}
+/* The log scrolls inside its own box (about a screen tall) so its column
+   headers can stay pinned while you scroll down the rows. */
+.tbl-scroll.log{max-height:calc(100vh - 40px)}
+.tbl-scroll.log thead th{position:sticky;top:0;z-index:2;background:#fff;padding-top:10px;box-shadow:0 1px 0 #f1f2f4}
 table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
 thead th{
   text-align:left;font-size:.7rem;font-weight:900;letter-spacing:.1em;
@@ -612,7 +616,7 @@ function tableCard(rows){
     </button></div>
     ${bulkBar(rows)}
 
-    <div class="tbl-scroll" style="margin-top:14px">
+    <div class="tbl-scroll log" style="margin-top:14px">
     <table>
       <thead><tr><th>Booked</th><th>Setter</th><th>Lead</th><th>Credit</th><th>Homeowner</th><th>Territory</th><th>Complaint</th>${isAdmin()?"<th>Channel</th>":""}<th>Phone</th><th>Email</th><th>Campaign</th><th>Location</th></tr></thead>
       <tbody>${body || `<tr><td colspan="${isAdmin()?12:11}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
