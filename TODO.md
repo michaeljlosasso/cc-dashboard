@@ -115,6 +115,7 @@
       "Comments: Open…" filter (spans all weeks) with "Resolve all shown" + one reply. Table
       `leads.cc_appt_comments`. Export has a Comments column. Saves update locally (no reload).
 
+- [x] **Red Flags filter** (Oct 24 2026): All / Red only / Clean only. Red = credit No, homeowner No, complaint, or out of territory (same rows the table shades with the magenta bar; duplicates alone don't count). Everyone sees it; exports name the file red-flags.
 - [x] **Complaint column** (Oct 23 2026): No by default; admin clicks to flag Yes (red).
       `leads.cc_complaint_flag`, /api/complaint. Everyone sees it; filter + export. Manual for now.
 

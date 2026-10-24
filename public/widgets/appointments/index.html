@@ -351,6 +351,13 @@ span.cmt-btn{cursor:inherit}
       </button>
       <div class="pop" id="cpPop"><div class="pop-list" id="cpList"></div></div>
     </div>
+    <div class="pop-wrap">
+      <button class="filter-control" id="rdBtn" aria-expanded="false">
+        <span id="rdLabel">Red Flags: All</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="pop" id="rdPop"><div class="pop-list" id="rdList"></div></div>
+    </div>
     <div class="pop-wrap" id="chWrap" style="display:none">
       <button class="filter-control" id="chBtn" aria-expanded="false">
         <span id="chLabel">Channel: All</span>
@@ -371,7 +378,7 @@ span.cmt-btn{cursor:inherit}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", sort:"booked", sortDir:"desc", ct:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", red:"", sort:"booked", sortDir:"desc", ct:"", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -409,7 +416,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildContractors(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComplaints(); buildComments(); showCommentFilter();
+    buildDupes(); buildWeeks(); buildAgents(); buildContractors(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComplaints(); buildRed(); buildComments(); showCommentFilter();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -546,6 +553,7 @@ function filtered(){
     if(S.ch && channel(r) !== S.ch) return false;
     if(S.terr && (inTerritory(r) ? "yes" : "no") !== S.terr) return false;
     if(S.cmp && (hasComplaint(r) ? "yes" : "no") !== S.cmp) return false;
+    if(S.red && (isRed(r) ? "yes" : "no") !== S.red) return false;
     return true;
   }).sort(sorter());
 }
@@ -679,7 +687,7 @@ function tableCard(rows){
           : "Same phone booked twice this day"}">${d.n}× ${cross?"cross":"dupe"}</span>`
       : "";
     return `
-    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":"", (qaVal(r,"credit")==="no" || qaVal(r,"home")==="no")?"qano":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
+    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":"", qaNo(r)?"qano":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
@@ -759,6 +767,7 @@ function exportCsv(rows){
   if(S.terr) parts.push("territory-" + S.terr);
   if(S.cm) parts.push("comments-" + S.cm);
   if(S.cmp) parts.push("complaint-" + S.cmp);
+  if(S.red) parts.push(S.red==="yes" ? "red-flags" : "no-red-flags");
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -907,6 +916,25 @@ function buildComplaints(){
       S.cmp = el.dataset.v; S.page = 1;
       list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.cmp));
       document.getElementById("cpLabel").textContent = `Complaint: ${(CP_OPTS.find(o=>o[0]===S.cmp)||CP_OPTS[0])[1]}`;
+      closePops(); render();
+    };
+  });
+}
+/* Red Flags filter: every row the table shades red with the magenta edge bar —
+ * credit No, homeowner No, a complaint, or out of territory (any one is enough).
+ * Duplicates get the light pink too but aren't a red flag, so they don't count.
+ */
+const qaNo = r => qaVal(r,"credit")==="no" || qaVal(r,"home")==="no";
+const isRed = r => qaNo(r) || hasComplaint(r) || !inTerritory(r);
+const RD_OPTS = [["","All"],["yes","Red only"],["no","Clean only"]];
+function buildRed(){
+  const list = document.getElementById("rdList");
+  list.innerHTML = RD_OPTS.map(([v,n])=>`<div class="pop-item${v===S.red?" on":""}" data-v="${v}">${n}</div>`).join("");
+  list.querySelectorAll(".pop-item").forEach(el=>{
+    el.onclick = ()=>{
+      S.red = el.dataset.v; S.page = 1;
+      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.red));
+      document.getElementById("rdLabel").textContent = `Red Flags: ${(RD_OPTS.find(o=>o[0]===S.red)||RD_OPTS[0])[1]}`;
       closePops(); render();
     };
   });
@@ -1298,7 +1326,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"],["ctBtn","ctPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"],["cmBtn","cmPop"],["cpBtn","cpPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["ctBtn","ctPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"],["cmBtn","cmPop"],["cpBtn","cpPop"],["rdBtn","rdPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();
