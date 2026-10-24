@@ -105,7 +105,9 @@ body{
 th.sortable{cursor:pointer;user-select:none}
 th.sortable:hover{color:#52525b}
 th.sortable.on{color:var(--ll-purple)}
-.tbl-scroll.log{max-height:calc(100vh - 40px)}
+/* Short enough that the pager and padding under it can't push the page far
+   enough to scroll these headers off the top (that's what happened at 100vh-40). */
+.tbl-scroll.log{max-height:calc(100vh - 120px)}
 .tbl-scroll.log thead th{position:sticky;top:0;z-index:2;background:#fff;padding-top:10px;box-shadow:0 1px 0 #f1f2f4}
 table{border-collapse:collapse;width:100%;font-size:.87rem;font-weight:700}
 thead th{
