@@ -151,6 +151,8 @@ tbody tr.oot td:first-child, tbody tr.cmpl td:first-child, tbody tr.qano td:firs
 /* same colors as the Credit / Homeowner Yes and No pills */
 .terr.in{color:#007e5c;background:rgba(0,181,128,.12)}
 .terr.out{color:#b90053;background:rgba(244,0,112,.10)}
+.terr.pend{color:#9a6400;background:rgba(255,176,32,.16)}
+.terr.nodata{color:#8a8f98;background:#f1f2f4}
 button.terr{cursor:pointer}
 button.terr:hover{box-shadow:0 0 0 2px rgba(138,86,243,.35)}
 button.terr:disabled{opacity:.5;cursor:wait}
@@ -572,6 +574,7 @@ const SORT_KEYS = {
   territory: r => inTerritory(r) ? 1 : 0,
   complaint: r => hasComplaint(r) ? 0 : 1,
   channel:   r => channel(r),
+  demo:      r => DEMO_RANK[demoOf(r)[0]],
   phone:     r => String(r[8]||"").replace(/\D/g,""),
   email:     r => String(r[9]||"").toLowerCase() || "~",
   campaign:  r => String(r[2]||"").toLowerCase(),
@@ -695,6 +698,7 @@ function tableCard(rows){
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>
       <td>${complaintCell(r)}</td>${isAdmin()?`
+      <td>${demoCell(r)}</td>
       <td>${chPill(r)}</td>`:""}
       <td class="mono">${esc(r[8]||"—")}</td>
       <td class="sub">${esc(r[9]||"—")}</td>
@@ -722,8 +726,8 @@ function tableCard(rows){
 
     <div class="tbl-scroll log" style="margin-top:14px">
     <table>
-      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${isAdmin()?th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
-      <tbody>${body || `<tr><td colspan="${isAdmin()?12:11}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${isAdmin()?th("Demo","demo")+th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
+      <tbody>${body || `<tr><td colspan="${isAdmin()?13:11}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
     ${pages>1?`<div class="pager">
@@ -742,7 +746,7 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory","Complaint",...(isAdmin()?["Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory","Complaint",...(isAdmin()?["Demo","Demo Basis","Advertiser Disposition","Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
@@ -750,7 +754,7 @@ function exportCsv(rows){
     lines.push([
       commentsOf(r).map(c => `[${c[2]}${c[5]==="resolved"?" · resolved":""}] ${c[3]}${c[6] ? ` → ${c[6]}` : ""}`).join(" | "),
       r[0], r[12] ? String(r[12]).slice(11,16) : "", r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
-      label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", ...(isAdmin()?[channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
+      label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", ...(isAdmin()?[DEMO_TXT[demoOf(r)[0]], demoOf(r)[1], demoOf(r)[2], channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
       d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",
       q ? humanize(q[1]) : "", q ? q[2] : "", q ? humanize(q[4]) : "", q ? q[5] : "",
@@ -851,6 +855,23 @@ function buildQaFilters(){
     });
   });
 }
+/* ---- Demo (ADMIN ONLY, display only — does not touch payroll) ----
+ * Did the appointment actually demo, per the advertiser's disposition feed
+ * (dispositions.appointment_demos, matched in the Worker by phone/email).
+ * Only GES, Clear Day, Venture and American Standard can be matched today;
+ * everything else is "No data" (—). Version 1.0 (Manny, Oct 25 2026).
+ */
+const DEMO_TXT  = { demoed:"Demoed", no_demo:"No Demo", pending:"Pending", "":"No data" };
+const DEMO_CLS  = { demoed:"in", no_demo:"out", pending:"pend", "":"nodata" };
+const DEMO_RANK = { no_demo:0, pending:1, demoed:2, "":3 };
+const demoOf = r => (r[11] && (S.data.appt_demo||{})[r[11]]) || ["","","","",""];
+function demoCell(r){
+  const [st, basis, dispo, at, adv] = demoOf(r);
+  if(!st) return '<span class="terr nodata" data-tip-h="No data" data-tip-w="No disposition feed for this booking yet (only GES, Clear Day, Venture and American Standard match today)." data-tip-q="">—</span>';
+  const why = [basis, at ? "Appointment " + at : ""].filter(Boolean).join(" · ");
+  return `<span class="terr ${DEMO_CLS[st]||"nodata"}" data-tip-h="${esc((adv||"Advertiser") + (dispo ? ": " + dispo : ""))}" data-tip-w="${esc(why)}" data-tip-q="">${DEMO_TXT[st]||esc(st)}</span>`;
+}
+
 /* ---- Channel (ADMIN ONLY) ----
  * appt_sms is only in the payload when signed in with the admin password —
  * the server leaves it out for agents, so nothing here is hidden client-side.
@@ -1139,6 +1160,7 @@ function detailsHtml(r){
       ${kv("Phone", esc(r[8]||""))}
       ${kv("Email", esc(r[9]||""))}
       ${kv("Location", esc([r[5], r[6]].filter(Boolean).join(", ")))}
+      ${isAdmin() ? kv("Demo", demoOf(r)[0] ? `${DEMO_TXT[demoOf(r)[0]]}${demoOf(r)[2] ? ` · ${esc(demoOf(r)[2])}` : ""}` : "No data") : ""}
       ${isAdmin() ? kv("Channel", channel(r)==="sms" ? "SMS" : "Call") : ""}
       ${kv("Lead ID", esc(r[11]||""))}
     </div></div>

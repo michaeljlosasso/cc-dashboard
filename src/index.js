@@ -476,6 +476,40 @@ FROM \`${PROJECT}.leads.cc_appt_comments\`
 ORDER BY created_at
 `;
 
+// ADMIN ONLY, display only — never feeds payroll (Manny, Oct 25 2026, "1.0").
+// Did the appointment actually demo? From dispositions.appointment_demos (a
+// read-only view over the advertisers' disposition loads). No shared lead id,
+// so: scope by advertiser from our campaign name, match phone (last 10 digits),
+// email when the feed has no phone (Venture), and take the advertiser record
+// nearest the booking date (within 45 days). Only GES, Clear Day, Venture and
+// American Standard can join; Pella and Long Home send no contact fields, and
+// Renuity isn't booked by this team. Anything unmatched shows "No data".
+const SQL_APPT_DEMOS = `
+WITH l AS (
+  SELECT leadID, createdOnDate AS d,
+         RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph,
+         LOWER(TRIM(IFNULL(email_address,''))) AS em,
+         CASE
+           WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^ges ') THEN 'ges'
+           WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^clear day') THEN 'clear_day'
+           WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^venture') THEN 'venture_solar'
+           WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^(american standard|as wt)') THEN 'american_standard'
+         END AS adv
+  FROM \`${PROJECT}.leads.leads_get_all\`
+  WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes' AND createdOnDate >= '2026-01-01'
+)
+SELECT l.leadID, d.demo_status, IFNULL(d.demo_basis,'') AS basis, IFNULL(d.disposition,'') AS disposition,
+       IFNULL(FORMAT_DATETIME('%Y-%m-%d %H:%M', d.appointment_at),'') AS appt_at, d.advertiser
+FROM l
+JOIN \`${PROJECT}.dispositions.appointment_demos\` d
+  ON d.advertiser_id = l.adv
+ AND ( (IFNULL(d.phone,'') != '' AND LENGTH(l.ph) = 10 AND RIGHT(d.phone,10) = l.ph)
+    OR (IFNULL(d.phone,'') = '' AND IFNULL(d.email,'') != '' AND l.em != '' AND LOWER(TRIM(d.email)) = l.em) )
+ AND ABS(DATE_DIFF(d.entry_date, l.d, DAY)) <= 45
+WHERE l.adv IS NOT NULL
+QUALIFY ROW_NUMBER() OVER (PARTITION BY l.leadID ORDER BY ABS(DATE_DIFF(d.entry_date, l.d, DAY)), d.record_id) = 1
+`;
+
 // Customer complaints (Manny, Oct 23 2026): No unless he flags one from the
 // admin view. Manual for now. Display only.
 const SQL_COMPLAINTS = `
@@ -619,7 +653,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments, complaints] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments, complaints, apptDemos] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -636,6 +670,7 @@ async function buildPayload(env, admin) {
     bq(env, SQL_APPT_MANUAL).catch(() => ({ rows: [] })),
     bq(env, SQL_COMMENTS).catch(() => ({ rows: [] })),
     bq(env, SQL_COMPLAINTS).catch(() => ({ rows: [] })),
+    admin ? bq(env, SQL_APPT_DEMOS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
   ]);
 
   const agentMap = {};
@@ -706,6 +741,9 @@ async function buildPayload(env, admin) {
     admin: !!admin,
     // ADMIN ONLY — never in the agent payload. Lead IDs that look texted.
     ...(admin ? { appt_sms: apptSms.rows.map((r) => r[0]) } : {}),
+    // ADMIN ONLY, display only. lead_id -> [demo_status (demoed|no_demo|pending),
+    //   basis, advertiser disposition, appointment_at, advertiser]. Missing = no data.
+    ...(admin ? { appt_demo: Object.fromEntries(apptDemos.rows.map((r) => [r[0], r.slice(1)])) } : {}),
   };
 }
 
