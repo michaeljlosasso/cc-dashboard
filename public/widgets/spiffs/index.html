@@ -183,7 +183,7 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900;white-space:n
   <div id="content"></div>
 </div>
 
-<script src="/widgets/shared/spiff-rules.js"></script>
+<script src="/widgets/shared/spiff-rules.js?v=20261026"></script>
 <script>
 "use strict";
 
@@ -258,7 +258,7 @@ function setsWeekFor(fridayIso){          // the week a Friday pays: Mon–Sun b
 function spiffForFriday(fridayIso){
   const [a,b] = setsWeekFor(fridayIso);
   const win = SpiffRules.windowFor(S.data.spiff_windows, a, b);
-  const ev = SpiffRules.evaluate(win, S.data.appts, a, b);
+  const ev = SpiffRules.evaluate(win, SpiffRules.payableRows(S.data.appts, S.data), a, b);
   const per = {};  // user -> {n, amt}
   for(const [u, n] of Object.entries(ev.qty)){
     per[u] = { n, amt: n * win[4] };
@@ -266,7 +266,7 @@ function spiffForFriday(fridayIso){
   // QA spiff stacks on top: points × rate. Adds dollars, not "qualifying"
   // bookings (points aren't bookings).
   const qaWin = SpiffRules.stackFor(S.data.spiff_windows, a, b);
-  const qaPts = SpiffRules.evaluate(qaWin, S.data.appts, a, b, S.data).qty;
+  const qaPts = SpiffRules.evaluate(qaWin, SpiffRules.payableRows(S.data.appts, S.data), a, b, S.data).qty;
   let qaTotalPts = 0;
   for(const [u, pts] of Object.entries(qaPts)){
     per[u] = per[u] || {n:0, amt:0};

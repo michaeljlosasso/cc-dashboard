@@ -255,7 +255,7 @@ tfoot td{padding:12px;border-top:2px solid #e5e7eb;font-weight:900}
   </div>
 </div>
 
-<script src="/widgets/shared/spiff-rules.js"></script>
+<script src="/widgets/shared/spiff-rules.js?v=20261026"></script>
 <script>
 "use strict";
 
@@ -420,7 +420,8 @@ function spiffDetail(x, R){
 }
 
 function compute(){
-  const rows = S.data.appts;
+  // Out-of-territory bookings (Oct 19 on) pay nothing — shared rule.
+  const rows = SpiffRules.payableRows(S.data.appts, S.data);
   const bk = buckets(S.friday);
   const ci = commissionInfo(S.friday);
 

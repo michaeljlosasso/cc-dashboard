@@ -994,14 +994,17 @@ document.addEventListener("click", (e)=>{
   if(b && !b.disabled){ e.stopPropagation(); toggleComplaint(b); }
 }, true);
 
+// Matches OOT_UNPAID_FROM in /widgets/shared/spiff-rules.js (the pay rule).
+const OOT_UNPAID_FROM = "2026-10-19";
 function terrCell(r){
   if(!r[11]) return '<span class="sub">—</span>';
   const yes = inTerritory(r), cls = yes ? "in" : "out", txt = yes ? "Yes" : "No";
+  const unpaid = r[0] >= OOT_UNPAID_FROM ? "Not commissionable — pays $0" : "";
   // Hover uses the same dark tooltip as the Credit / Homeowner pills.
-  const tip = yes ? "" : ` data-tip-h="Out Of Territory" data-tip-w="" data-tip-q=""`;
+  const tip = yes ? "" : ` data-tip-h="Out Of Territory" data-tip-w="${unpaid}" data-tip-q=""`;
   if(!isAdmin()) return `<span class="terr ${cls}"${tip}>${txt}</span>`;
   const adminTip = yes ? ` data-tip-h="In Territory" data-tip-w="Click to mark out of territory" data-tip-q=""`
-                       : ` data-tip-h="Out Of Territory" data-tip-w="Click to mark in territory" data-tip-q=""`;
+                       : ` data-tip-h="Out Of Territory" data-tip-w="${unpaid ? unpaid + " · " : ""}Click to mark in territory" data-tip-q=""`;
   return `<button class="terr ${cls}" data-terr="${esc(r[11])}"${adminTip}>${txt}</button>`;
 }
 async function toggleTerritory(btn){

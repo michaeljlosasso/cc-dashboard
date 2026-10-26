@@ -39,6 +39,24 @@
     return topic === "credit" ? q[0] : q[3];
   }
 
+  // Out of territory = uncommissionable (Manny, Oct 26 2026): a booking he
+  // flags out of territory pays NOTHING — no set pay, no spiff, no QA points,
+  // and it doesn't count toward a team goal. Applies to bookings from Oct 19
+  // on (he chose to include the week paid Oct 30); earlier weeks are already
+  // paid as they were. The booking still shows on the Appointments tab.
+  // Every pay screen filters through payableRows() so they can't disagree.
+  const OOT_UNPAID_FROM = "2026-10-19";
+  function unpaidOot(r, ctx) {
+    if (!r || !r[11] || !r[A_DATE] || r[A_DATE] < OOT_UNPAID_FROM) return false;
+    const out = (ctx && ctx.out_territory) || [];
+    return out.indexOf(r[11]) !== -1;
+  }
+  function payableRows(rows, ctx) {
+    const out = new Set((ctx && ctx.out_territory) || []);
+    if (!out.size) return rows || [];
+    return (rows || []).filter((r) => !(r[11] && r[A_DATE] >= OOT_UNPAID_FROM && out.has(r[11])));
+  }
+
   const RULES = {
     // $rate for each booking whose appointment is the same day or the next day.
     // eLocal transfers are excluded — they're handed off, not booked, so they
@@ -137,5 +155,6 @@
   // Browser widgets read window.SpiffRules; the Worker imports this same file
   // (src/index.js) and reads globalThis.SpiffRules for the owner Payouts view.
   (typeof window !== "undefined" ? window : globalThis).SpiffRules =
-    { RULES, windowFor, stackFor, evaluate, goalLine, isTransfer, qaValue, QA_POINTS };
+    { RULES, windowFor, stackFor, evaluate, goalLine, isTransfer, qaValue, QA_POINTS,
+      OOT_UNPAID_FROM, payableRows, unpaidOot };
 })();

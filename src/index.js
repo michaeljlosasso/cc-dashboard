@@ -844,21 +844,24 @@ async function handleAdmin(request, env, url, adminSess) {
     const agg = {};
     const get = (u) => (agg[u] || (agg[u] = row(u)));
 
-    for (const [d, u] of payload.appts) {
+    // Out-of-territory bookings (Oct 19 on) pay nothing: no set pay, no
+    // spiff, no QA points, no team-goal credit. Shared rule in spiff-rules.js.
+    const SR = globalThis.SpiffRules;
+    const payAppts = SR.payableRows(payload.appts, payload);
+    for (const [d, u] of payAppts) {
       if (!u || d < week || d > weekEnd) continue;
       get(u).appts++;
     }
     // Programmatic spiff: ONLY when one was turned on for this week, using the
     // same shared rules as the Commission tab (it used to count same/next-day
     // every week, spiff or not, which overstated weeks with no spiff).
-    const SR = globalThis.SpiffRules;
     const spiffWin = SR.windowFor(payload.spiff_windows, week, weekEnd);
-    const spiffEv = SR.evaluate(spiffWin, payload.appts, week, weekEnd);
+    const spiffEv = SR.evaluate(spiffWin, payAppts, week, weekEnd);
     const spiffRate = spiffWin ? Number(spiffWin[4]) : 0;
     for (const [u, n] of Object.entries(spiffEv.qty)) get(u).spiff_qty += n;
     // QA spiff stacks on top (points × rate), from the same shared rules.
     const qaWin = SR.stackFor(payload.spiff_windows, week, weekEnd);
-    const qaEv = SR.evaluate(qaWin, payload.appts, week, weekEnd, payload);
+    const qaEv = SR.evaluate(qaWin, payAppts, week, weekEnd, payload);
     const qaRate = qaWin ? Number(qaWin[4]) : 0;
     for (const [u, n] of Object.entries(qaEv.qty)) get(u).qa_points += n;
     for (const [, u, amount, , d] of payload.spiffs) {
