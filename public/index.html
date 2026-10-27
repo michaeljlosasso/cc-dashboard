@@ -205,7 +205,7 @@ const NAV_SECTIONS = [
       { icon: "search", label: "Call Finder", path: "https://call-finder.llmedia.info",
         sub: "Search, play, download and export VICIdial call recordings",
         chat: "https://claude.ai/chat/11e418f0-605b-4f33-842c-ff7fc268064f" },
-      { icon: "search", label: "Lookup", path: "https://reverse-lookup.llmedia.info/cc/",
+      { icon: "search", label: "Lookup", path: "https://reverse-lookup-cc.llmedia.info/cc/",
         sub: "Who's behind a phone number or address",
         chat: "https://claude.ai/cowork/cse_015shaQKikMZLJk2af8u7EUR" },
     ],
@@ -280,7 +280,7 @@ NAV_SECTIONS.forEach(sec => {
  * touches the URL, localStorage or sessionStorage: a URL leaks through history,
  * referrers and server logs, and storage outlives the session that earned it.
  */
-const LOOKUP_ORIGIN = "https://reverse-lookup.llmedia.info";
+const LOOKUP_ORIGIN = "https://reverse-lookup-cc.llmedia.info";
 let currentFrame = null;
 
 window.addEventListener("message", async (event) => {
