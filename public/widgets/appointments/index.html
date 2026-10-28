@@ -163,6 +163,7 @@ tbody tr.oot td:first-child, tbody tr.cmpl td:first-child, tbody tr.qano td:firs
 /* same colors as the Credit / Homeowner Yes and No pills */
 .terr.in{color:#007e5c;background:rgba(0,181,128,.12)}
 .terr.out{color:#b90053;background:rgba(244,0,112,.10)}
+.terr.sn-next{color:#0083a6;background:rgba(0,197,255,.12)}
 .terr.pend{color:#9a6400;background:rgba(255,176,32,.16)}
 .terr.nodata{color:#8a8f98;background:#f1f2f4}
 button.terr{cursor:pointer}
@@ -354,7 +355,7 @@ span.cmt-btn{cursor:inherit}
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE = 50;
-const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", red:"", sort:"booked", sortDir:"desc", ct:"", page:1 };
+const S = { data:null, err:null, week:null, weeks:[], agent:"", dup:"", credit:"", home:"", ch:"", terr:"", cm:"", cmp:"", red:"", sn:"", sort:"booked", sortDir:"desc", ct:"", page:1 };
 // dupKey -> {n, agents:Set}. Key = same phone booked on the same day.
 // "cross" = the same homeowner credited to two different setters that day,
 // which is the case that actually pays twice for one lead.
@@ -510,6 +511,7 @@ function filtered(){
       if(!d) return false;
       if(S.dup === "cross" && d.agents.size < 2) return false;
     }
+    if(S.sn && snKind(r) !== S.sn && !(S.sn === "sn" && (snKind(r) === "same" || snKind(r) === "next"))) return false;
     if(S.credit && qaVal(r,"credit") !== S.credit) return false;
     if(S.home && qaVal(r,"home") !== S.home) return false;
     if(S.ch && channel(r) !== S.ch) return false;
@@ -529,6 +531,7 @@ const SORT_KEYS = {
   booked:    r => r[12] || r[0],
   setter:    r => r[1] ? (S.data.agents[r[1]]||r[1]).toLowerCase() : "~",
   lead:      r => `${r[3]||""} ${r[4]||""}`.trim().toLowerCase(),
+  sn:        r => { const d = snDays(r); return d === null ? 9999 : d; },
   credit:    r => QA_RANK[qaVal(r,"credit")],
   home:      r => QA_RANK[qaVal(r,"home")],
   territory: r => inTerritory(r) ? 1 : 0,
@@ -567,6 +570,7 @@ function th(label, key){
  */
 const HF = {
   lead:      [{ title:"Duplicates", key:"dup",    opts:() => DUP_OPTS }, { title:"Comments", key:"cm", admin:true, opts:() => CM_OPTS }],
+  sn:        [{ title:"Same / Next", key:"sn",   opts:() => SN_OPTS }],
   credit:    [{ title:"Credit",     key:"credit", opts:() => QA_FILTER_OPTS }],
   home:      [{ title:"Homeowner",  key:"home",   opts:() => QA_FILTER_OPTS }],
   territory: [{ title:"In territory", key:"terr", opts:() => TR_OPTS }],
@@ -584,7 +588,7 @@ function closeHf(){ const m = document.getElementById("hfPop"); if(m) m.remove()
 function openHf(btn){
   const col = btn.dataset.hf;
   if(HF_OPEN === col){ closeHf(); return; }
-  closeHf(); closePops(); HF_OPEN = col;
+  closeHf(); closePops(); HF_OPEN = col; HF_AT = Date.now();
   const m = document.createElement("div");
   m.id = "hfPop"; m.className = "hf-pop";
   m.innerHTML = hfSections(col).map(sec => `
@@ -607,7 +611,10 @@ document.addEventListener("click", (e)=>{
   closeHf();
 }, true);
 document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeHf(); });
-document.addEventListener("scroll", (e)=>{ if(!(e.target.closest && e.target.closest("#hfPop"))) closeHf(); }, true);
+// Ignore the scroll a click itself can cause (bringing the funnel into view)
+// right as the menu opens; a real scroll afterwards closes it.
+let HF_AT = 0;
+document.addEventListener("scroll", (e)=>{ if(Date.now() - HF_AT > 300 && !(e.target.closest && e.target.closest("#hfPop"))) closeHf(); }, true);
 window.addEventListener("resize", closeHf);
 
 document.addEventListener("click", (e)=>{
@@ -707,6 +714,7 @@ function tableCard(rows){
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
+      <td>${snCell(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>
@@ -739,8 +747,8 @@ function tableCard(rows){
 
     <div class="tbl-scroll log" style="margin-top:14px">
     <table>
-      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${isAdmin()?th("Demo","demo")+th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
-      <tbody>${body || `<tr><td colspan="${isAdmin()?13:11}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
+      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Same / Next","sn")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${isAdmin()?th("Demo","demo")+th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
+      <tbody>${body || `<tr><td colspan="${isAdmin()?14:12}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
     ${pages>1?`<div class="pager">
@@ -759,7 +767,7 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Credit","Homeowner","In Territory","Complaint",...(isAdmin()?["Demo","Demo Basis","Advertiser Disposition","Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Same / Next","Credit","Homeowner","In Territory","Complaint",...(isAdmin()?["Demo","Demo Basis","Advertiser Disposition","Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
@@ -767,7 +775,7 @@ function exportCsv(rows){
     lines.push([
       commentsOf(r).map(c => `[${c[2]}${c[5]==="resolved"?" · resolved":""}] ${c[3]}${c[6] ? ` → ${c[6]}` : ""}`).join(" | "),
       r[0], r[12] ? String(r[12]).slice(11,16) : "", r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
-      label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", ...(isAdmin()?[DEMO_TXT[demoOf(r)[0]], demoOf(r)[1], demoOf(r)[2], channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
+      snText(r), label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", ...(isAdmin()?[DEMO_TXT[demoOf(r)[0]], demoOf(r)[1], demoOf(r)[2], channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
       d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",
       q ? humanize(q[1]) : "", q ? q[2] : "", q ? humanize(q[4]) : "", q ? q[5] : "",
@@ -785,6 +793,7 @@ function exportCsv(rows){
   if(S.cm) parts.push("comments-" + S.cm);
   if(S.cmp) parts.push("complaint-" + S.cmp);
   if(S.red) parts.push(S.red==="yes" ? "red-flags" : "no-red-flags");
+  if(S.sn) parts.push(S.sn === "sn" ? "same-next" : S.sn);
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -852,6 +861,31 @@ function qaPill(r, topic){
   return `<span class="qa-cell">${pill}<button class="qa-pen" title="Correct this" data-lead="${esc(r[11])}" data-topic="${topic}">✎</button></span>`;
 }
 const QA_FILTER_OPTS = [["","All"],["yes","Yes"],["no","No"],["unclear","Unclear"],["notasked","Not Asked"],["none","Not scored"]];
+/* ---- Same / Next (Manny, Oct 28 2026) ----
+ * Days from the booking date to the appointment date, the same math the
+ * same/next-day spiff uses (calendar days, Eastern). Display only: a spiff
+ * still applies its own rules (transfers excluded, out of territory $0).
+ */
+const SN_OPTS = [["","All"],["sn","Same or next day"],["same","Same day"],["next","Next day"],["later","2+ days out"],["none","No appointment time"]];
+function snDays(r){
+  if(!r[10] || !r[0]) return null;
+  return Math.round((parse(String(r[10]).slice(0,10)) - parse(r[0])) / 86400000);
+}
+function snKind(r){
+  const d = snDays(r);
+  return d === null ? "none" : d <= 0 ? "same" : d === 1 ? "next" : "later";
+}
+function snText(r){
+  const d = snDays(r);
+  return d === null ? "" : d <= 0 ? "Same day" : d === 1 ? "Next day" : `${d} days`;
+}
+function snCell(r){
+  const d = snDays(r);
+  if(d === null) return '<span class="sub">—</span>';
+  if(d <= 1) return `<span class="terr ${d <= 0 ? "in" : "sn-next"}">${d <= 0 ? "Same Day" : "Next Day"}</span>`;
+  return `<span class="sub">${d} days</span>`;
+}
+
 /* ---- Demo (ADMIN ONLY, display only — does not touch payroll) ----
  * Did the appointment actually demo, per the advertiser's disposition feed
  * (dispositions.appointment_demos, matched in the Worker by phone/email).
