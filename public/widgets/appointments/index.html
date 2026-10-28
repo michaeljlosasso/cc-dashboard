@@ -105,6 +105,18 @@ body{
 th.sortable{cursor:pointer;user-select:none}
 th.sortable:hover{color:#52525b}
 th.sortable.on{color:var(--ll-purple)}
+.th-in{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.hf-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:6px;
+  background:transparent;color:#b4b8c0;cursor:pointer;transition:background 140ms ease,color 140ms ease}
+.hf-btn:hover{background:#f1f2f4;color:#52525b}
+.hf-btn.on{color:var(--ll-purple);background:rgba(138,86,243,.12)}
+th.filtered{color:var(--ll-purple)}
+.hf-pop{position:fixed;z-index:80;min-width:200px;max-width:280px;max-height:min(420px,calc(100vh - 16px));overflow:auto;padding:6px;
+  border:1px solid rgba(229,231,235,.94);border-radius:13px;background:#fff;
+  box-shadow:0 22px 54px rgba(25,23,24,.14),0 2px 8px rgba(25,23,24,.08);
+  text-transform:none;letter-spacing:normal;font-family:"Nunito",sans-serif}
+.hf-sec + .hf-sec{border-top:1px solid #f1f2f4;margin-top:4px;padding-top:4px}
+.hf-h{padding:8px 12px 4px;font-size:.7rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 /* Short enough that the pager and padding under it can't push the page far
    enough to scroll these headers off the top (that's what happened at 100vh-40). */
 .tbl-scroll.log{max-height:calc(100vh - 120px)}
@@ -309,44 +321,6 @@ span.cmt-btn{cursor:inherit}
       <div class="pop" id="ctPop"><div class="pop-list" id="ctList"></div></div>
     </div>
     <div class="pop-wrap">
-      <button class="filter-control" id="dpBtn" aria-expanded="false">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a56f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-        </svg>
-        <span id="dpLabel">All Appointments</span>
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="pop" id="dpPop"><div class="pop-list" id="dpList"></div></div>
-    </div>
-    <div class="pop-wrap">
-      <button class="filter-control" id="crBtn" aria-expanded="false">
-        <span id="crLabel">Credit: All</span>
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="pop" id="crPop"><div class="pop-list" id="crList"></div></div>
-    </div>
-    <div class="pop-wrap">
-      <button class="filter-control" id="hoBtn" aria-expanded="false">
-        <span id="hoLabel">Homeowner: All</span>
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="pop" id="hoPop"><div class="pop-list" id="hoList"></div></div>
-    </div>
-    <div class="pop-wrap" id="cmWrap" style="display:none">
-      <button class="filter-control" id="cmBtn" aria-expanded="false">
-        <span id="cmLabel">Comments: All</span>
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="pop" id="cmPop"><div class="pop-list" id="cmList"></div></div>
-    </div>
-    <div class="pop-wrap">
-      <button class="filter-control" id="trBtn" aria-expanded="false">
-        <span id="trLabel">Territory: All</span>
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="pop" id="trPop"><div class="pop-list" id="trList"></div></div>
-    </div>
-    <div class="pop-wrap">
       <button class="filter-control" id="cpBtn" aria-expanded="false">
         <span id="cpLabel">Complaint: All</span>
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -418,7 +392,7 @@ async function load(){
     const j = await r.json();
     if(!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     S.data = j;
-    buildDupes(); buildWeeks(); buildAgents(); buildContractors(); buildDupFilter(); buildQaFilters(); buildChannel(); buildTerritory(); buildComplaints(); buildRed(); buildComments(); showCommentFilter();
+    buildDupes(); buildWeeks(); buildAgents(); buildContractors(); buildChannel(); buildTerritory(); buildComplaints(); buildRed(); buildComments();
     const m = j.meta;
     if(m && m.last_sync){
       const t = new Date(m.last_sync);
@@ -521,20 +495,6 @@ const DUP_OPTS = [
   ["cross", "Cross-setter dupes"],
 ];
 
-function buildDupFilter(){
-  const list = document.getElementById("dpList");
-  list.innerHTML = DUP_OPTS.map(([v,n])=>`
-    <div class="pop-item${v===S.dup?" on":""}" data-d="${v}">${n}</div>`).join("");
-  list.querySelectorAll(".pop-item").forEach(el=>{
-    el.onclick = ()=>{
-      S.dup = el.dataset.d; S.page = 1;
-      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.d===S.dup));
-      document.getElementById("dpLabel").textContent =
-        (DUP_OPTS.find(o=>o[0]===S.dup)||DUP_OPTS[0])[1];
-      closePops(); render();
-    };
-  });
-}
 
 function filtered(){
   const a = S.week, b = iso(addDays(parse(S.week),6));
@@ -595,8 +555,61 @@ function sorter(){
 function th(label, key){
   const on = (S.sort || "booked") === key;
   const arrow = on ? (S.sortDir === "asc" ? " ▲" : " ▼") : "";
-  return `<th class="sortable${on ? " on" : ""}" data-sort="${key}" title="Sort by ${label}">${label}${arrow}</th>`;
+  const hf = HF[key] && hfSections(key).length ? hfBtn(key) : "";
+  return `<th class="sortable${on ? " on" : ""}${hf && hfActive(key) ? " filtered" : ""}" data-sort="${key}" title="Sort by ${label}"><span class="th-in">${label}${arrow}${hf}</span></th>`;
 }
+
+/* ---- Column-header filters (Manny, Oct 28 2026) ----
+ * Credit, Homeowner, Territory, and Lead (duplicates + admin-only comments)
+ * filter from a funnel in their column header instead of the filter bar.
+ * Clicking the label still sorts; the funnel opens the menu. The menu is
+ * position:fixed on <body>, because the table box scrolls and would clip it.
+ */
+const HF = {
+  lead:      [{ title:"Duplicates", key:"dup",    opts:() => DUP_OPTS }, { title:"Comments", key:"cm", admin:true, opts:() => CM_OPTS }],
+  credit:    [{ title:"Credit",     key:"credit", opts:() => QA_FILTER_OPTS }],
+  home:      [{ title:"Homeowner",  key:"home",   opts:() => QA_FILTER_OPTS }],
+  territory: [{ title:"In territory", key:"terr", opts:() => TR_OPTS }],
+};
+const hfSections = col => (HF[col] || []).filter(x => !x.admin || isAdmin());
+const hfActive = col => hfSections(col).some(x => S[x.key]);
+function hfBtn(col){
+  const now = hfSections(col).filter(x => S[x.key]).map(x => `${x.title}: ${(x.opts().find(o => o[0] === S[x.key]) || ["",""])[1]}`);
+  const tip = now.length ? now.join(" · ") : "Filter";
+  return `<button class="hf-btn${now.length ? " on" : ""}" data-hf="${col}" title="${esc(tip)}" aria-label="Filter ${esc(col)}">`
+    + `<svg width="12" height="12" viewBox="0 0 24 24" fill="${now.length ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button>`;
+}
+let HF_OPEN = null;
+function closeHf(){ const m = document.getElementById("hfPop"); if(m) m.remove(); HF_OPEN = null; }
+function openHf(btn){
+  const col = btn.dataset.hf;
+  if(HF_OPEN === col){ closeHf(); return; }
+  closeHf(); closePops(); HF_OPEN = col;
+  const m = document.createElement("div");
+  m.id = "hfPop"; m.className = "hf-pop";
+  m.innerHTML = hfSections(col).map(sec => `
+    <div class="hf-sec">${hfSections(col).length > 1 ? `<div class="hf-h">${esc(sec.title)}</div>` : ""}
+      ${sec.opts().map(([v,n]) => `<div class="pop-item${(S[sec.key]||"") === v ? " on" : ""}" data-k="${sec.key}" data-v="${esc(v)}">${esc(n)}</div>`).join("")}
+    </div>`).join("");
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(r.left - 10, innerWidth - w - 8)) + "px";
+  m.style.top  = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - 6 - h) : r.bottom + 6) + "px";
+  m.querySelectorAll(".pop-item").forEach(el => {
+    el.onclick = () => { S[el.dataset.k] = el.dataset.v; S.page = 1; closeHf(); render(); };
+  });
+}
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest && e.target.closest(".hf-btn");
+  if(b){ e.stopPropagation(); e.preventDefault(); openHf(b); return; }
+  if(e.target.closest && e.target.closest("#hfPop")) return;
+  closeHf();
+}, true);
+document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeHf(); });
+document.addEventListener("scroll", (e)=>{ if(!(e.target.closest && e.target.closest("#hfPop"))) closeHf(); }, true);
+window.addEventListener("resize", closeHf);
+
 document.addEventListener("click", (e)=>{
   const h = e.target.closest && e.target.closest("th[data-sort]");
   if(!h) return;
@@ -839,22 +852,6 @@ function qaPill(r, topic){
   return `<span class="qa-cell">${pill}<button class="qa-pen" title="Correct this" data-lead="${esc(r[11])}" data-topic="${topic}">✎</button></span>`;
 }
 const QA_FILTER_OPTS = [["","All"],["yes","Yes"],["no","No"],["unclear","Unclear"],["notasked","Not Asked"],["none","Not scored"]];
-function buildQaFilters(){
-  [["credit","crList","crLabel","Credit"],["home","hoList","hoLabel","Homeowner"]].forEach(([key,listId,labelId,name])=>{
-    const list = document.getElementById(listId);
-    list.innerHTML = QA_FILTER_OPTS.map(([v,n])=>`
-      <div class="pop-item${v===S[key]?" on":""}" data-v="${v}">${n}</div>`).join("");
-    list.querySelectorAll(".pop-item").forEach(el=>{
-      el.onclick = ()=>{
-        S[key] = el.dataset.v; S.page = 1;
-        list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S[key]));
-        document.getElementById(labelId).textContent =
-          `${name}: ${(QA_FILTER_OPTS.find(o=>o[0]===S[key])||QA_FILTER_OPTS[0])[1]}`;
-        closePops(); render();
-      };
-    });
-  });
-}
 /* ---- Demo (ADMIN ONLY, display only — does not touch payroll) ----
  * Did the appointment actually demo, per the advertiser's disposition feed
  * (dispositions.appointment_demos, matched in the Worker by phone/email).
@@ -909,16 +906,6 @@ const inTerritory = r => !OUT.has(r[11]);
 const TR_OPTS = [["","All"],["yes","Yes"],["no","No"]];
 function buildTerritory(){
   OUT = new Set(S.data.out_territory || []);
-  const list = document.getElementById("trList");
-  list.innerHTML = TR_OPTS.map(([v,n])=>`<div class="pop-item${v===S.terr?" on":""}" data-v="${v}">${n}</div>`).join("");
-  list.querySelectorAll(".pop-item").forEach(el=>{
-    el.onclick = ()=>{
-      S.terr = el.dataset.v; S.page = 1;
-      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.terr));
-      document.getElementById("trLabel").textContent = `Territory: ${(TR_OPTS.find(o=>o[0]===S.terr)||TR_OPTS[0])[1]}`;
-      closePops(); render();
-    };
-  });
 }
 /* ---- Customer complaints ----
  * No by default; Manny flags Yes from the admin view (click the pill). Manual
@@ -1038,27 +1025,14 @@ document.addEventListener("click", (e)=>{
  */
 const TOPICS = ["Credit","Homeowner","Territory","Customer","Other"];
 let CMT = new Map();          // lead_id -> [comment rows], oldest first
+const CM_OPTS = [["","All"],["open","Open (all topics)"],...TOPICS.map(t=>["open:"+t,"Open · "+t]),["any","Has comments"]];
 function buildComments(){
   CMT = new Map();
   for(const c of (S.data.comments||[])){
     if(!CMT.has(c[1])) CMT.set(c[1], []);
     CMT.get(c[1]).push(c);
   }
-  const opts = [["","All"],["open","Open (all topics)"],...TOPICS.map(t=>["open:"+t,"Open · "+t]),["any","Has comments"]];
-  const list = document.getElementById("cmList");
-  list.innerHTML = opts.map(([v,n])=>`<div class="pop-item${v===S.cm?" on":""}" data-v="${v}">${n}</div>`).join("");
-  list.querySelectorAll(".pop-item").forEach(el=>{
-    el.onclick = ()=>{
-      S.cm = el.dataset.v; S.page = 1;
-      list.querySelectorAll(".pop-item").forEach(x=>x.classList.toggle("on",x.dataset.v===S.cm));
-      document.getElementById("cmLabel").textContent = "Comments: " + ((opts.find(o=>o[0]===S.cm)||opts[0])[1]);
-      closePops(); render();
-    };
-  });
 }
-// The Comments filter is admin-only — it's how Manny batch-reviews open
-// comments. Agents just use the bubble on each row.
-function showCommentFilter(){ const w = document.getElementById("cmWrap"); if(w) w.style.display = isAdmin() ? "" : "none"; }
 const commentsOf = r => CMT.get(r[11]) || [];
 const openOf = r => commentsOf(r).filter(c => c[5] !== "resolved");
 function cmMatch(r){
@@ -1351,7 +1325,7 @@ function closePops(){
   document.querySelectorAll(".pop").forEach(p=>p.classList.remove("open"));
   document.querySelectorAll(".filter-control").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
-[["wkBtn","wkPop"],["agBtn","agPop"],["ctBtn","ctPop"],["dpBtn","dpPop"],["crBtn","crPop"],["hoBtn","hoPop"],["chBtn","chPop"],["trBtn","trPop"],["cmBtn","cmPop"],["cpBtn","cpPop"],["rdBtn","rdPop"]].forEach(([b,p])=>{
+[["wkBtn","wkPop"],["agBtn","agPop"],["ctBtn","ctPop"],["chBtn","chPop"],["cpBtn","cpPop"],["rdBtn","rdPop"]].forEach(([b,p])=>{
   const btn=document.getElementById(b), pop=document.getElementById(p);
   btn.onclick = (e)=>{
     e.stopPropagation();
