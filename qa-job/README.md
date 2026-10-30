@@ -61,3 +61,13 @@ Image `v4-1-20261030170338` (live). From Manny's review of the Oct 19–25 agent
   still Not Asked/stated_only; Eric Klein → Pass/confirmed.
 - Applies to new scores only. Earlier rows keep rubric_version='v4'.
 Rollback: `gcloud run jobs update vicidial-appointment-qa --region us-central1 --image us-central1-docker.pkg.dev/ll-media-project/gcf-artifacts/vicidial-appointment-qa:v4-20261020160905`
+
+## v4.2 — any credit-score mention = Unclear (Oct 30 2026, Manny)
+Image `v4-2-20261030171758` (live). "Anytime they ask or anytime they mention the credit score, I'm counting that
+as unclear… where they don't mention it at all, it's not payable."
+- Credit: setter states the credit score requirement (a number / "credit score"), with or without a
+  question → at least Unclear (`stated_only` is now Unclear). Pass still needs the homeowner to confirm.
+- "Financing options" / "if you qualify" with no credit score said → Not Asked.
+- Dry run: Abel Aguilar → Unclear/stated_only; Paul Woods → Not Asked (cut off before the number);
+  Sharon Martin → Unclear.
+- New scores only. Rows scored before keep their rubric_version.

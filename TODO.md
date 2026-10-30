@@ -115,6 +115,7 @@
       "Comments: Open…" filter (spans all weeks) with "Resolve all shown" + one reply. Table
       `leads.cc_appt_comments`. Export has a Comments column. Saves update locally (no reload).
 
+- [x] **QA rubric v4.2** (Oct 30 2026, Manny): any credit-score mention = Unclear ($1); only no mention at all is Not Asked. Oct 19–25 review: $10 from comments (Oscar $8, Jon $2) + $8 not commented (Jon $4, Bernardo $2, Felix $2) = $18.
 - [x] **QA rubric v4.1** (Oct 30 2026, Manny): stated credit number + any question after it (even "is that something you are looking to do?") = asked → Pass if they confirm, else Unclear ($1). Live in the QA job; details in qa-job/README.md. Oct 19–25 comment review: second payment $9 (Oscar $7, Jon $2) — pencil corrections on the dashboard not applied yet (awaiting Manny).
 - [x] **Same / Next column** (Oct 28 2026): Same Day (green) / Next Day (cyan) / "N days" / — (no appointment time), days from booking date to appointment date (same math as the same_next spiff). Everyone sees it. Header funnel filter (Same or next / Same / Next / 2+ / No time), sortable, in export. Display only.
 - [x] **Column-header filters** (Oct 28 2026): Credit, Homeowner, Territory and Lead (Duplicates + admin-only Comments) filter from a funnel in the header; removed from the filter bar. Label click still sorts. Menu is position:fixed on body (`openHf`, `HF` config) so the scrolling table box cannot clip it. Funnel + header turn purple when active. Still in the bar: Week, Agents, Contractors, Complaint, Red Flags, Channel (admin).

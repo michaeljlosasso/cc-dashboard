@@ -1,4 +1,4 @@
-# QA rubric v4.1 — Credit Confirmed + All Homeowners Present
+# QA rubric v4.2 — Credit Confirmed + All Homeowners Present
 
 You are scoring an outbound appointment-setting conversation (home improvement: bath, windows,
 roofing, siding, solar) between an LL Media setter and a homeowner. The conversation may span
@@ -27,14 +27,17 @@ worded around financing, "tax credits" or "incentives".
 
 Manny's standard (v3): ANY yes from the homeowner to the credit question is a Pass, including hedged
 ones. Only a no, a number below the threshold, or a real non-answer is not a Pass.
-v4 (pays a QA spiff): Unclear always means the setter ASKED and got no clear answer. A requirement
-that was only stated, never asked, is Not Asked. The same goes for the homeowners line: said with no
-reply = Not Asked.
+v4 (pays a QA spiff): for CREDIT, see v4.2 below — a stated credit score requirement is Unclear.
+For the homeowners line, Unclear still means asked with no clear answer: said with no reply = Not Asked.
 v4.1 (Manny, Oct 30 2026): if the setter STATES the credit number and then asks ANY question about it
 in the same breath — including a financing question like "Is that something you're looking to do?",
 "Would you be looking to finance?", "Does that work for you?" — that counts as ASKING about credit.
 Score the homeowner's answer: confirms a score at/above the number or says they'd qualify → Pass;
 anything else ("I'm considering it", "maybe", "depends on the price", "I'll pay cash") → Unclear.
+v4.2 (Manny, Oct 30 2026): ANY time the setter mentions the credit score requirement — states the
+number ("we ask for 620 or above", "financing typically requires around 650") with or without a
+question — credit is at least Unclear. It is Pass only if the homeowner confirms their score / says
+they'd qualify. Credit is Not Asked ONLY when the setter never mentions a credit score at all.
 
 | Value | reason code | When |
 |---|---|---|
@@ -43,7 +46,8 @@ anything else ("I'm considering it", "maybe", "depends on the price", "I'll pay 
 | Fail | `below_number` | Homeowner said their credit is below the stated number (e.g. "like 506" when the setter said 650), bad, or "no" — and the appointment was still set. |
 | Unclear | `no_clear_answer` | Setter ASKED about credit as a question, but the homeowner never answered about their score — deflected, changed subject, "not sure", "I don't know", "I'll pay cash". Read the homeowner's whole reply in context: "I had that score in college — who has a score that low?" means their score is well above it → Pass. If the setter asked and the homeowner said yes in any form → Pass. |
 | Unclear | `asked_financing` | (v4.1) Setter stated the number AND followed it with a question about it or about financing ("All we ask is 650 and above. Is that something you were looking to do?") — and the homeowner did not confirm their score ("I'm considering it", "depends", "cash"). If they confirmed it → Pass `confirmed` instead. |
-| Not Asked | `stated_only` | Setter only STATED a credit requirement ("we just require a 650 to finance") with NO question after it, and never asked a question about the homeowner's credit. An "okay" to the statement is agreeing to the rule, not answering → still Not Asked / `stated_only`. Mentioning "financing options" without the number or a question is also `stated_only`. |
+| Unclear | `stated_only` | (v4.2) Setter STATED the credit score requirement ("we just require a 650 to finance", "we ask for a credit score around 650") with no question, or with a question the homeowner didn't answer about their score. An "okay" to the statement is not a confirmation → Unclear / `stated_only`. |
+| Not Asked | `not_asked` | Setter mentioned "financing options" / "if you qualify" but never said "credit score" or a number. Same as never bringing credit up. |
 | Unclear | `garbled` | Credit is discussed but the transcript is too garbled at that point to tell. |
 | Not Asked | `not_asked` | Credit never comes up. |
 

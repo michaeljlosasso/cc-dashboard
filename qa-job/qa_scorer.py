@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-RUBRIC_VERSION = "v4.1"  # v4.1 (Oct 30): stated number + any question after it = asked (financing question counts). v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
+RUBRIC_VERSION = "v4.2"  # v4.2 (Oct 30): any mention of the credit score = at least Unclear. v4.1 (Oct 30): stated number + any question after it = asked (financing question counts). v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
 RUBRIC_PATH = Path(__file__).with_name("qa_rubric.md")
 SMS_RUBRIC_PATH = Path(__file__).with_name("qa_rubric_sms.md")
 PROVIDER = os.environ.get("QA_PROVIDER", "openai")          # "openai" (gpt-5, same key as the Leadspedia analyzer) or "anthropic"
