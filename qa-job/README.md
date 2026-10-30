@@ -47,3 +47,17 @@ Image `v4-20261020160905`. Unclear now always means the setter ASKED: a credit r
 Not Asked (`stated_only`); a homeowners line nobody answered is Not Asked (`no_acknowledgment`).
 That makes pill = pay for the QA spiff (Yes $2, Unclear $1 per question; No / Not Asked $0).
 10 affected rows from Oct 19+ backed up to `leads.appointment_qa_backup_20261020_v4` and re-scored.
+
+## v4.1 — stated number + a question = asked (Oct 30 2026, Manny)
+Image `v4-1-20261030170338` (live). From Manny's review of the Oct 19–25 agent comments (Sharon Martin):
+"He clearly said 650, and then, is that something you're looking to do? That's good. That's worth a buck."
+- Credit: if the setter states the number and follows it with ANY question about it or about
+  financing ("Is that something you're looking to do?", "Would you be looking to finance?"), that
+  counts as ASKED. Homeowner confirms a score / says they'd qualify → Pass; anything else → Unclear
+  (new reason `asked_financing`). Number with no question after it is still `stated_only` / Not Asked.
+- `max_completion_tokens` 3000 → 8000: long calls (Eric Klein, 394s) used the whole budget on
+  reasoning and returned no content.
+- Dry run before deploy: Sharon Martin → Unclear/asked_financing; Abel Aguilar and Paul Woods →
+  still Not Asked/stated_only; Eric Klein → Pass/confirmed.
+- Applies to new scores only. Earlier rows keep rubric_version='v4'.
+Rollback: `gcloud run jobs update vicidial-appointment-qa --region us-central1 --image us-central1-docker.pkg.dev/ll-media-project/gcf-artifacts/vicidial-appointment-qa:v4-20261020160905`

@@ -16,14 +16,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-RUBRIC_VERSION = "v4"  # v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
+RUBRIC_VERSION = "v4.1"  # v4.1 (Oct 30): stated number + any question after it = asked (financing question counts). v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
 RUBRIC_PATH = Path(__file__).with_name("qa_rubric.md")
 SMS_RUBRIC_PATH = Path(__file__).with_name("qa_rubric_sms.md")
 PROVIDER = os.environ.get("QA_PROVIDER", "openai")          # "openai" (gpt-5, same key as the Leadspedia analyzer) or "anthropic"
 DEFAULT_MODEL = os.environ.get("QA_MODEL", "gpt-5" if PROVIDER == "openai" else "claude-sonnet-4-5")
 
 VALUES = {"Pass", "Fail", "Unclear", "Not Asked", "N/A"}
-CREDIT_REASONS = {"confirmed", "below_number", "no_clear_answer", "soft_answer", "garbled", "stated_only", "not_asked", "not_scorable"}
+CREDIT_REASONS = {"confirmed", "below_number", "no_clear_answer", "soft_answer", "garbled", "asked_financing", "stated_only", "not_asked", "not_scorable"}
 HOMEOWNER_REASONS = {"confirmed", "acknowledged", "sole_owner", "owner_absent", "decision_maker_absent",
                      "bundled_with_credit", "no_acknowledgment", "ambiguous", "not_asked", "not_scorable"}
 NOT_REQUIRED = "Not Required"
@@ -217,7 +217,7 @@ def score_with_openai(appt: Appointment, model: str = DEFAULT_MODEL, api_key: st
         messages=[{"role": "system", "content": rubric}, {"role": "user", "content": convo}],
         response_format={"type": "json_schema",
                          "json_schema": {"name": "appointment_qa_v2", "strict": True, "schema": OUTPUT_SCHEMA}},
-        max_completion_tokens=3000,
+        max_completion_tokens=8000,  # v4.1: long calls ran out at 3000 (reasoning) and returned no content
         reasoning_effort="medium",
     )
     if not resp.choices or not resp.choices[0].message.content:
