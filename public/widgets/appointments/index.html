@@ -242,6 +242,21 @@ span.cmt-btn{cursor:inherit}
 .lead-open{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .lead-open:hover{color:var(--ll-purple);text-decoration:underline;text-underline-offset:3px}
 .dsec{margin-bottom:14px}
+.tx details{border:1px solid #eef0f2;border-radius:12px;margin-bottom:8px;background:#fff}
+.tx summary{cursor:pointer;list-style:none;padding:9px 12px;font-size:.82rem;font-weight:850;display:flex;align-items:center;gap:8px}
+.tx summary::-webkit-details-marker{display:none}
+.tx summary::before{content:"▸";color:#9ca3af;font-size:.8rem}
+.tx details[open] summary::before{content:"▾"}
+.tx summary .sub{margin-left:auto;font-weight:750}
+.tx-body{padding:2px 12px 12px}
+.tx audio{width:100%;height:34px;margin:2px 0 10px}
+.tx-turn{display:flex;gap:8px;margin:5px 0;font-size:.83rem;font-weight:650;line-height:1.4}
+.tx-turn .who{flex:none;width:38px;font-size:.66rem;font-weight:900;letter-spacing:.03em;padding-top:3px;color:#9ca3af;text-align:right}
+.tx-turn.s0 .who{color:#0094aa} .tx-turn.s1 .who{color:#8a56f3} .tx-turn.s2 .who{color:#d09f00}
+.tx-msg{max-width:88%;margin:6px 0;padding:7px 10px;border-radius:12px;font-size:.83rem;font-weight:650;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;background:#f4f4f5}
+.tx-msg.us{margin-left:auto;background:rgba(138,86,243,.10)}
+.tx-msg.bot{margin-left:auto;background:rgba(0,197,255,.10)}
+.tx-msg .m{display:block;font-size:.64rem;font-weight:900;letter-spacing:.03em;color:#9ca3af;margin-bottom:2px;text-transform:uppercase}
 .dsec h4{margin:0 0 8px;font-family:"Outfit",sans-serif;font-size:.7rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#0094aa}
 .dgrid{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:.84rem}
 .dgrid .k{color:var(--muted);font-weight:800}
@@ -1092,7 +1107,65 @@ let PANEL = null;             // the appointment row the panel is showing
 function openPanel(lead){
   const r = S.data.appts.find(x => x[11] === lead); if(!r) return;
   PANEL = r; drawPanel(); document.getElementById("cmtPanel").classList.add("open");
+  loadTranscript(lead);
 }
+
+/* ---- Transcripts in the drawer (ADMIN ONLY, Manny Nov 17 2026) ----
+ * The recorded-call transcripts and the text thread for this booking, pulled
+ * on demand from /api/transcript when the drawer opens. Only what already
+ * exists is shown — nothing is generated here. Kept per lead so reopening is
+ * instant, and re-drawn sections remember which ones were expanded.
+ */
+const TX = new Map();          // lead -> "loading" | {calls, texts} | {error}
+const TX_OPEN = new Set();     // "lead:c0", "lead:texts" — sections left expanded
+async function loadTranscript(lead){
+  if(!isAdmin() || !lead || TX.has(lead)) return;
+  TX.set(lead, "loading");
+  if(PANEL && PANEL[11] === lead) drawPanel();
+  try{
+    const r = await fetch("/api/transcript?lead=" + encodeURIComponent(lead), { credentials:"same-origin" });
+    const j = await r.json();
+    TX.set(lead, r.ok ? j : { error: j.error || ("HTTP " + r.status) });
+  }catch(e){ TX.set(lead, { error: String(e.message || e) }); }
+  if(PANEL && PANEL[11] === lead) drawPanel();
+}
+const TX_STATUS = { APPTBK:"Booked", CALLBK:"Callback", AL:"Voicemail", LTMGAD:"Left message", DQ:"Disqualified", RECYLE:"Recycle", REBOOK:"Rebook", DNC:"Do not call" };
+const TX_ROLE = { human:["Setter","us"], closebot:["AI bot","bot"], app_other:["AI bot","bot"], revive:["AI bot","bot"],
+                  workflow:["Auto","bot"], missed_call_textback:["Auto","bot"], homeowner:["Homeowner",""] };
+const mmss = s => `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,"0")}`;
+const txWhen = dt => dt ? `${fmt(dt.slice(0,10))} · ${clock(dt)}` : "";
+function transcriptHtml(r){
+  if(!isAdmin() || !r[11]) return "";
+  const lead = r[11], t = TX.get(lead);
+  let body;
+  if(!t || t === "loading") body = '<div class="cp-empty">Loading…</div>';
+  else if(t.error) body = `<div class="cp-empty">Couldn't load: ${esc(t.error)}</div>`;
+  else {
+    const open = k => TX_OPEN.has(lead + ":" + k) ? " open" : "";
+    const calls = (t.calls || []).map((c, i) => {
+      const [dt, agent, status, sec, audio, segs, full] = c;
+      const speakers = [...new Set(segs.map(g => g[0]))];
+      const turns = segs.length
+        ? segs.map(g => `<div class="tx-turn s${Math.min(2, speakers.indexOf(g[0]))}"><span class="who">${mmss(g[1]/1000)}</span><div>${esc(g[2])}</div></div>`).join("")
+        : `<div class="tx-turn"><div>${esc(full) || '<span class="sub">No words in this transcript.</span>'}</div></div>`;
+      return `<details data-tx="c${i}"${open("c"+i)}>
+        <summary>Call · ${txWhen(dt)}<span class="sub">${esc(agent || "—")} · ${esc(TX_STATUS[status] || status || "")} · ${mmss(sec)}</span></summary>
+        <div class="tx-body">${audio ? `<audio controls preload="none" src="${esc(audio)}"></audio>` : ""}${turns}</div></details>`;
+    }).join("");
+    const msgs = t.texts || [];
+    const texts = msgs.length ? `<details data-tx="texts"${open("texts")}>
+        <summary>Text thread<span class="sub">${msgs.length} message${msgs.length===1?"":"s"}</span></summary>
+        <div class="tx-body">${msgs.map(m => { const ro = TX_ROLE[m[1]] || (m[2]==="inbound" ? ["Homeowner",""] : ["Auto","bot"]);
+          return `<div class="tx-msg ${ro[1]}"><span class="m">${ro[0]} · ${txWhen(m[0])}</span>${esc(m[3])}</div>`; }).join("")}</div></details>` : "";
+    body = (calls + texts) || `<div class="cp-empty">No transcript or text thread on file for this booking${t.texts_failed ? " (texts couldn't be read)" : ""}.</div>`;
+  }
+  return `<div class="dsec tx"><h4>Transcript</h4>${body}</div>`;
+}
+document.addEventListener("toggle", (e)=>{
+  const d = e.target; if(!d || !d.dataset || !d.dataset.tx || !PANEL) return;
+  const k = PANEL[11] + ":" + d.dataset.tx;
+  if(d.open) TX_OPEN.add(k); else TX_OPEN.delete(k);
+}, true);
 function closePanel(){ PANEL = null; document.getElementById("cmtPanel").classList.remove("open"); }
 function drawPanel(msg, isErr){
   const r = PANEL; if(!r) return;
@@ -1176,6 +1249,7 @@ function detailsHtml(r){
       ${kv("Lead ID", esc(r[11]||""))}
     </div></div>
     <div class="dsec"><h4>Call QA</h4>${qaLine("credit","Credit")}${qaLine("home","Homeowner")}</div>
+    ${transcriptHtml(r)}
     <div class="dsec"><h4>Flags</h4>
       <div class="qa-line"><span class="lbl">Territory</span><div>${terrCell(r)}</div></div>
       <div class="qa-line"><span class="lbl">Complaint</span><div>${complaintCell(r)}

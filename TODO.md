@@ -115,6 +115,7 @@
       "Comments: Open…" filter (spans all weeks) with "Resolve all shown" + one reply. Table
       `leads.cc_appt_comments`. Export has a Comments column. Saves update locally (no reload).
 
+- [x] **Transcript in the drawer — ADMIN ONLY** (Nov 17 2026): drawer shows the recorded-call transcripts (with audio player) and the GHL text thread for the booking, loaded on demand from `GET /api/transcript?lead=` (vicidial.call_transcripts −7d/+1d, sms.ghl_messages −14d/+3d around the booking). Read-only; nothing is generated. Collapsed by default; agents get 403.
 - [x] **QA rubric v4.2** (Oct 30 2026, Manny): any credit-score mention = Unclear ($1); only no mention at all is Not Asked. Oct 19–25 review: $10 from comments (Oscar $8, Jon $2) + $8 not commented (Jon $4, Bernardo $2, Felix $2) = $18.
 - [x] **QA rubric v4.1** (Oct 30 2026, Manny): stated credit number + any question after it (even "is that something you are looking to do?") = asked → Pass if they confirm, else Unclear ($1). Live in the QA job; details in qa-job/README.md. Oct 19–25 comment review: second payment $9 (Oscar $7, Jon $2) — pencil corrections on the dashboard not applied yet (awaiting Manny).
 - [x] **Same / Next column** (Oct 28 2026): Same Day (green) / Next Day (cyan) / "N days" / — (no appointment time), days from booking date to appointment date (same math as the same_next spiff). Everyone sees it. Header funnel filter (Same or next / Same / Next / 2+ / No time), sortable, in export. Display only.

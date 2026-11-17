@@ -1354,6 +1354,81 @@ export default {
         });
       }
 
+      /* ---- transcript for one appointment (ADMIN ONLY, read-only) ----
+       * Manny, Nov 17 2026: show the call transcript / text thread in the
+       * appointment drawer so he doesn't open another dashboard. Shows only
+       * what already exists — nothing is transcribed or generated here.
+       * Calls: vicidial.call_transcripts (completed) to the booking's phone
+       * from 7 days before it posted to 1 day after. Texts: sms.ghl_messages
+       * from 14 days before to 3 days after. Admin only because the text
+       * thread reveals which bookings were set by text (see SQL_APPT_SMS).
+       */
+      if (path === "/api/transcript") {
+        if (!adminSess) {
+          return new Response(JSON.stringify({ error: "admin only" }), { status: 403, headers: JSON_HEADERS });
+        }
+        const lead = url.searchParams.get("lead") || "";
+        if (!/^[A-Za-z0-9]{6,16}$/.test(lead)) {
+          return new Response(JSON.stringify({ error: "bad lead id" }), { status: 400, headers: JSON_HEADERS });
+        }
+        const booking = `
+          SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone_home,''), r'\\D', ''), 10) AS ph, createdOn AS bat
+          FROM \`${PROJECT}.leads.leads_get_all\` WHERE leadID = '${lead}'
+          UNION ALL
+          SELECT RIGHT(REGEXP_REPLACE(IFNULL(phone,''), r'\\D', ''), 10), booked_at
+          FROM \`${PROJECT}.leads.cc_appt_manual\` WHERE id = '${lead}'
+          LIMIT 1`;
+        try {
+          const [calls, texts] = await Promise.all([
+            bq(env, `
+              WITH b AS (${booking})
+              SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', t.call_date) AS dt, IFNULL(t.agent_name,'') AS agent,
+                     IFNULL(t.call_status,'') AS status, t.length_in_sec AS sec, IFNULL(t.recording_location,'') AS loc,
+                     TO_JSON_STRING(ARRAY(SELECT AS STRUCT g.speaker AS s, g.start_ms AS t, g.text AS x
+                                          FROM UNNEST(t.segments) g ORDER BY g.segment_index)) AS segs,
+                     IFNULL(t.full_transcript,'') AS full_text
+              FROM \`${PROJECT}.vicidial.call_transcripts\` t JOIN b
+                ON RIGHT(t.phone_number, 10) = b.ph AND LENGTH(b.ph) = 10
+              WHERE t.transcription_status = 'completed'
+                AND DATETIME(t.call_date) BETWEEN DATETIME_SUB(b.bat, INTERVAL 7 DAY) AND DATETIME_ADD(b.bat, INTERVAL 1 DAY)
+              QUALIFY ROW_NUMBER() OVER (PARTITION BY t.recording_id ORDER BY t.transcript_version DESC) = 1
+              ORDER BY t.call_date
+              LIMIT 12`),
+            bq(env, `
+              WITH b AS (${booking})
+              SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', m.date_added_et) AS dt, IFNULL(m.sender_type,'') AS sender,
+                     IFNULL(m.direction,'') AS direction, m.body
+              FROM \`${PROJECT}.sms.ghl_messages\` m JOIN b
+                ON m.contact_phone10 = b.ph AND LENGTH(b.ph) = 10
+              WHERE IFNULL(TRIM(m.body),'') != ''
+                AND m.date_added_et BETWEEN DATETIME_SUB(b.bat, INTERVAL 14 DAY) AND DATETIME_ADD(b.bat, INTERVAL 3 DAY)
+              ORDER BY m.date_added, m.message_id
+              LIMIT 200`).catch(() => ({ rows: [], failed: true })),
+          ]);
+          const AUDIO_PROXY = "https://vicidial-audio-proxy-v3-fln7xiyq5a-uc.a.run.app";
+          const out = {
+            // [dt (Eastern), agent, status, seconds, audio url | "", [[speaker, start_ms, text]…], full_text]
+            calls: calls.rows.map((r) => {
+              let segs = [];
+              try { segs = (JSON.parse(r[5] || "[]") || []).map((g) => [g.s || "", Number(g.t) || 0, g.x || ""]); } catch (e) { segs = []; }
+              const rec = String(r[4] || "").replace(/^https?:\/\/[^/]+/, "");
+              const audio = /\.mp3$/i.test(rec) ? `${AUDIO_PROXY}?path=${encodeURIComponent(rec)}` : "";
+              return [r[0], r[1], r[2], Number(r[3]) || 0, audio, segs, segs.length ? "" : r[6]];
+            }),
+            // [dt (Eastern), sender_type, direction, body]
+            texts: texts.rows,
+            texts_failed: !!texts.failed,
+          };
+          return new Response(JSON.stringify(out), {
+            headers: { ...JSON_HEADERS, "Cache-Control": "private, max-age=300" },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: String(err && err.message ? err.message : err) }), {
+            status: 500, headers: JSON_HEADERS,
+          });
+        }
+      }
+
       if (path === "/api/me") {
         return new Response(JSON.stringify({ admin: adminSess }), {
           headers: { ...JSON_HEADERS, "Cache-Control": "no-store" },
