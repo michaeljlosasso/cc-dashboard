@@ -2,6 +2,30 @@
 
 ## Next up
 
+### ▶ Week of Nov 23 — Manny is coming back for this: "call close" spiff (noted Nov 17 2026)
+Manny's plan, in his words: load the **call closes** into "some sort of script database", then check
+whether the guys **match the call close and book the appointment properly, setting expectations
+properly**. The spiff should "incentivize behavior that is going to make the appointments better,
+book us more appointments."
+- **What he'll bring:** the call-close script(s). Nothing to build until he does.
+- **Likely build:** store the close script(s) (per buyer/vertical if they differ) in a table; add a third
+  QA score to the appointment scorer ("Close followed": Yes / Partly / No, with the quote) next to
+  Credit and Homeowner; show it as a pill + drawer line (transcript quote-jump already works); then a
+  saved spiff that pays on it (same shape as `qa_bonus`).
+- **Why he wants a change:** he feels he's overpaying. Same/next-day ran Nov 2, 9 and 16 at $165 / $210 /
+  ~$200 and doesn't move behavior (~60% of bookings are same/next day with or without it). QA spiff was
+  ~$125/wk and did move credit asking (Not Asked 19% with it → 30–33% after).
+- **Context to remember:**
+  - He told Jonathan NOT to ask credit by text (long credit text, people stop replying). Data: 53 people
+    asked credit by text in 6 weeks, 8 went silent and never booked; homeowner question loses more (33%).
+    So any text-booking scoring should not require the credit question.
+  - No evidence asking credit on calls hurts bookings (booked per 60s+ conversation: 16–17% normal;
+    12.5% and 11.3% the weeks of Oct 26 / Nov 2; back to 15.8% Nov 9 at the same ask rate).
+  - Cheaper option he hasn't used lately: saved `team-goal-80` (pays only if the team hits the number).
+  - Still open from Oct 30: the 6 pencil corrections for Oct 19–25 were paid by hand ($10) but never
+    entered on the dashboard; GHL-call claims (Ralph Spagnola +$4 Jon; Stott/Witherspoon/Mcgee +$3 Oscar) unverified.
+
+
 - [ ] **Setter attribution v2 (closes the text-set blind spot)**
   - [x] Create `leads.appt_setter_map` table (done — SA granted project write)
   - [x] Backfill loaded: 683 rows, Jun 1 – Aug 6 (`source='csv_backfill'`, Andres normalized)
