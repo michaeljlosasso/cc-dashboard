@@ -222,7 +222,7 @@ span.cmt-btn{cursor:inherit}
 .cp-head h3{margin:0;font-size:1.02rem;font-weight:900}
 .cp-head .sub{margin-top:3px}
 .cp-close{position:absolute;top:12px;right:12px;border:0;background:#f4f4f5;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem;font-weight:900;color:#52525b}
-.cp-list{flex:1;overflow:auto;padding:12px 18px;display:flex;flex-direction:column;gap:10px}
+.cp-list{flex:1;min-height:0;overflow:auto;padding:12px 18px;display:flex;flex-direction:column;gap:10px}
 .cp-empty{color:var(--muted);font-weight:700;font-size:.86rem;padding:10px 0}
 .cmt{border:1px solid #eef0f2;border-radius:12px;padding:10px 12px;background:#fafafa}
 .cmt.resolved{background:#fff;opacity:.85}
@@ -242,21 +242,44 @@ span.cmt-btn{cursor:inherit}
 .lead-open{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .lead-open:hover{color:var(--ll-purple);text-decoration:underline;text-underline-offset:3px}
 .dsec{margin-bottom:14px}
-.tx details{border:1px solid #eef0f2;border-radius:12px;margin-bottom:8px;background:#fff}
-.tx summary{cursor:pointer;list-style:none;padding:9px 12px;font-size:.82rem;font-weight:850;display:flex;align-items:center;gap:8px}
-.tx summary::-webkit-details-marker{display:none}
-.tx summary::before{content:"▸";color:#9ca3af;font-size:.8rem}
-.tx details[open] summary::before{content:"▾"}
-.tx summary .sub{margin-left:auto;font-weight:750}
-.tx-body{padding:2px 12px 12px}
-.tx audio{width:100%;height:34px;margin:2px 0 10px}
-.tx-turn{display:flex;gap:8px;margin:5px 0;font-size:.83rem;font-weight:650;line-height:1.4}
-.tx-turn .who{flex:none;width:38px;font-size:.66rem;font-weight:900;letter-spacing:.03em;padding-top:3px;color:#9ca3af;text-align:right}
+#cmtPanel.wide{width:min(1120px,calc(100vw - 340px));min-width:min(820px,100vw)}
+.cp-cols{flex:1;min-height:0;display:flex}
+.cp-left{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+#cmtPanel.wide .cp-left{flex:0 0 400px;border-right:1px solid #f1f2f4}
+#cmtPanel.wide .cp-form textarea{min-height:52px}
+.cp-nav{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:6px}
+.cp-nav .cp-close{position:static}
+.cp-step{border:0;background:#f4f4f5;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1.1rem;font-weight:900;color:#52525b;line-height:1}
+.cp-step:hover,.cp-close:hover{background:#e9e9ec}
+tbody tr.sel{outline:2px solid var(--ll-purple);outline-offset:-2px}
+#txPane{position:relative;flex:1;min-width:0;min-height:0;overflow:auto;background:#fafafa;padding:0 18px 18px}
+.tx-empty{padding:40px 10px;text-align:center;color:var(--muted);font-weight:700;font-size:.9rem}
+.tx-sec{margin-bottom:18px}
+.tx-head{position:sticky;top:0;z-index:2;background:#fafafa;padding:14px 0 8px;border-bottom:1px solid #eef0f2}
+.tx-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:.9rem;font-weight:900}
+.tx-title .sub{font-weight:750}
+.tx-head audio{width:100%;height:36px;margin-top:8px}
+.tx-body{padding-top:10px}
+.tx-turn{display:flex;align-items:flex-start;gap:10px;margin:2px -8px;padding:4px 8px;border-radius:8px;font-size:.88rem;font-weight:650;line-height:1.45}
+.tx-turn .who{flex:none;width:40px;border:0;background:none;padding:2px 0 0;font-family:inherit;font-size:.68rem;font-weight:900;letter-spacing:.03em;color:#9ca3af;text-align:right;cursor:pointer}
+.tx-turn .who:hover{text-decoration:underline}
 .tx-turn.s0 .who{color:#0094aa} .tx-turn.s1 .who{color:#8a56f3} .tx-turn.s2 .who{color:#d09f00}
-.tx-msg{max-width:88%;margin:6px 0;padding:7px 10px;border-radius:12px;font-size:.83rem;font-weight:650;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;background:#f4f4f5}
-.tx-msg.us{margin-left:auto;background:rgba(138,86,243,.10)}
-.tx-msg.bot{margin-left:auto;background:rgba(0,197,255,.10)}
+.tx-turn.s1 .tx-t{color:#3f3f46}
+.tx-msg{max-width:82%;width:fit-content;margin:8px 0;padding:8px 11px;border-radius:12px;font-size:.88rem;font-weight:650;line-height:1.45;white-space:pre-wrap;word-wrap:break-word;background:#fff;border:1px solid #eef0f2}
+.tx-msg.us{margin-left:auto;background:rgba(138,86,243,.10);border-color:transparent}
+.tx-msg.bot{margin-left:auto;background:rgba(0,197,255,.10);border-color:transparent}
 .tx-msg .m{display:block;font-size:.64rem;font-weight:900;letter-spacing:.03em;color:#9ca3af;margin-bottom:2px;text-transform:uppercase}
+.tx-el.hit{background:rgba(255,217,0,.28)!important;box-shadow:inset 3px 0 0 #d09f00}
+button.q.qjump{display:block;border:0;background:none;padding:0;text-align:left;font-family:inherit;font-size:inherit;cursor:pointer}
+button.q.qjump:hover{color:var(--ll-purple);text-decoration:underline;text-underline-offset:3px}
+button.q.qjump.miss::after{content:" (not found in the transcript)";font-style:normal;color:#b90053;font-size:.74rem}
+@media (max-width:1000px){
+  #cmtPanel.wide{width:100vw;min-width:0}
+  #cmtPanel.wide .cp-cols{flex-direction:column;overflow:auto}
+  #cmtPanel.wide .cp-left{flex:none;border-right:0}
+  #cmtPanel.wide .cp-left .cp-list{overflow:visible}
+  #txPane{overflow:visible;flex:none}
+}
 .dsec h4{margin:0 0 8px;font-family:"Outfit",sans-serif;font-size:.7rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#0094aa}
 .dgrid{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:.84rem}
 .dgrid .k{color:var(--muted);font-weight:800}
@@ -725,7 +748,7 @@ function tableCard(rows){
           : "Same phone booked twice this day"}">${d.n}× ${cross?"cross":"dupe"}</span>`
       : "";
     return `
-    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":"", qaNo(r)?"qano":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
+    <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":"", qaNo(r)?"qano":"", (PANEL && r[11] && PANEL[11]===r[11])?"sel":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
       <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
@@ -1107,17 +1130,43 @@ let PANEL = null;             // the appointment row the panel is showing
 function openPanel(lead){
   const r = S.data.appts.find(x => x[11] === lead); if(!r) return;
   PANEL = r; drawPanel(); document.getElementById("cmtPanel").classList.add("open");
-  loadTranscript(lead);
+  markSel(); loadTranscript(lead);
+}
+// Highlight the open appointment's row in the table.
+function markSel(){
+  document.querySelectorAll("tbody tr.sel").forEach(t => t.classList.remove("sel"));
+  if(!PANEL || !PANEL[11]) return;
+  const tr = document.querySelector(`tbody tr[data-row="${CSS.escape(PANEL[11])}"]`);
+  if(tr){ tr.classList.add("sel"); tr.scrollIntoView({ block:"nearest" }); }
+}
+// Next / previous appointment in the table's current order (filters + sort),
+// turning the page when it runs off the one showing.
+function stepPanel(dir){
+  if(!PANEL) return;
+  const rows = filtered().filter(r => r[11]);
+  const i = rows.findIndex(r => r[11] === PANEL[11]);
+  const j = i < 0 ? 0 : i + dir;
+  if(j < 0 || j >= rows.length) return;
+  const all = filtered(), at = all.indexOf(rows[j]);
+  const page = Math.floor(at / PAGE) + 1;
+  if(page !== S.page){ S.page = page; render(); }
+  openPanel(rows[j][11]);
+}
+function panelPos(){
+  if(!PANEL) return "";
+  const rows = filtered().filter(r => r[11]);
+  const i = rows.findIndex(r => r[11] === PANEL[11]);
+  return i < 0 ? "" : `${i + 1} of ${rows.length}`;
 }
 
 /* ---- Transcripts in the drawer (ADMIN ONLY, Manny Nov 17 2026) ----
  * The recorded-call transcripts and the text thread for this booking, pulled
  * on demand from /api/transcript when the drawer opens. Only what already
  * exists is shown — nothing is generated here. Kept per lead so reopening is
- * instant, and re-drawn sections remember which ones were expanded.
+ * instant. In the admin view the drawer is wide: details on the left, the
+ * transcript on the right, and clicking a QA quote jumps to it.
  */
 const TX = new Map();          // lead -> "loading" | {calls, texts} | {error}
-const TX_OPEN = new Set();     // "lead:c0", "lead:texts" — sections left expanded
 async function loadTranscript(lead){
   if(!isAdmin() || !lead || TX.has(lead)) return;
   TX.set(lead, "loading");
@@ -1134,42 +1183,84 @@ const TX_ROLE = { human:["Setter","us"], closebot:["AI bot","bot"], app_other:["
                   workflow:["Auto","bot"], missed_call_textback:["Auto","bot"], homeowner:["Homeowner",""] };
 const mmss = s => `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,"0")}`;
 const txWhen = dt => dt ? `${fmt(dt.slice(0,10))} · ${clock(dt)}` : "";
+// What the right-hand pane is showing; it's only rebuilt when this changes,
+// so saving a comment doesn't reset the scroll or stop the recording.
+function txKey(lead){ const t = TX.get(lead); return lead + ":" + (!t || t === "loading" ? "loading" : t.error ? "error" : "ready"); }
 function transcriptHtml(r){
-  if(!isAdmin() || !r[11]) return "";
   const lead = r[11], t = TX.get(lead);
-  let body;
-  if(!t || t === "loading") body = '<div class="cp-empty">Loading…</div>';
-  else if(t.error) body = `<div class="cp-empty">Couldn't load: ${esc(t.error)}</div>`;
-  else {
-    const open = k => TX_OPEN.has(lead + ":" + k) ? " open" : "";
-    const calls = (t.calls || []).map((c, i) => {
-      const [dt, agent, status, sec, audio, segs, full] = c;
-      const speakers = [...new Set(segs.map(g => g[0]))];
-      const turns = segs.length
-        ? segs.map(g => `<div class="tx-turn s${Math.min(2, speakers.indexOf(g[0]))}"><span class="who">${mmss(g[1]/1000)}</span><div>${esc(g[2])}</div></div>`).join("")
-        : `<div class="tx-turn"><div>${esc(full) || '<span class="sub">No words in this transcript.</span>'}</div></div>`;
-      return `<details data-tx="c${i}"${open("c"+i)}>
-        <summary>Call · ${txWhen(dt)}<span class="sub">${esc(agent || "—")} · ${esc(TX_STATUS[status] || status || "")} · ${mmss(sec)}</span></summary>
-        <div class="tx-body">${audio ? `<audio controls preload="none" src="${esc(audio)}"></audio>` : ""}${turns}</div></details>`;
-    }).join("");
-    const msgs = t.texts || [];
-    const texts = msgs.length ? `<details data-tx="texts"${open("texts")}>
-        <summary>Text thread<span class="sub">${msgs.length} message${msgs.length===1?"":"s"}</span></summary>
-        <div class="tx-body">${msgs.map(m => { const ro = TX_ROLE[m[1]] || (m[2]==="inbound" ? ["Homeowner",""] : ["Auto","bot"]);
-          return `<div class="tx-msg ${ro[1]}"><span class="m">${ro[0]} · ${txWhen(m[0])}</span>${esc(m[3])}</div>`; }).join("")}</div></details>` : "";
-    body = (calls + texts) || `<div class="cp-empty">No transcript or text thread on file for this booking${t.texts_failed ? " (texts couldn't be read)" : ""}.</div>`;
-  }
-  return `<div class="dsec tx"><h4>Transcript</h4>${body}</div>`;
+  if(!t || t === "loading") return '<div class="tx-empty">Loading transcript…</div>';
+  if(t.error) return `<div class="tx-empty">Couldn't load the transcript: ${esc(t.error)}</div>`;
+  const calls = (t.calls || []).map((c, i) => {
+    const [dt, agent, status, sec, audio, segs, full] = c;
+    const speakers = [...new Set(segs.map(g => g[0]))];
+    const turns = segs.length
+      ? segs.map(g => `<div class="tx-turn tx-el s${Math.min(2, speakers.indexOf(g[0]))}"><button class="who" data-seek="${Math.floor(g[1]/1000)}" title="Play from here">${mmss(g[1]/1000)}</button><div class="tx-t">${esc(g[2])}</div></div>`).join("")
+      : `<div class="tx-turn tx-el"><div class="tx-t">${esc(full) || '<span class="sub">No words in this transcript.</span>'}</div></div>`;
+    return `<section class="tx-sec" data-call="${i}">
+      <div class="tx-head"><div class="tx-title">Call · ${txWhen(dt)}<span class="sub">${esc(agent || "—")} · ${esc(TX_STATUS[status] || status || "")} · ${mmss(sec)}</span></div>
+        ${audio ? `<audio controls preload="none" src="${esc(audio)}"></audio>` : '<div class="sub">No recording to play.</div>'}</div>
+      <div class="tx-body">${turns}</div></section>`;
+  }).join("");
+  const msgs = t.texts || [];
+  const texts = msgs.length ? `<section class="tx-sec">
+      <div class="tx-head"><div class="tx-title">Text thread<span class="sub">${msgs.length} message${msgs.length===1?"":"s"}</span></div></div>
+      <div class="tx-body">${msgs.map(m => { const ro = TX_ROLE[m[1]] || (m[2]==="inbound" ? ["Homeowner",""] : ["Auto","bot"]);
+        return `<div class="tx-msg tx-el ${ro[1]}"><span class="m">${ro[0]} · ${txWhen(m[0])}</span><span class="tx-t">${esc(m[3])}</span></div>`; }).join("")}</div></section>` : "";
+  return (calls + texts) || `<div class="tx-empty">No transcript or text thread on file for this booking${t.texts_failed ? " (texts couldn't be read)" : ""}.</div>`;
 }
-document.addEventListener("toggle", (e)=>{
-  const d = e.target; if(!d || !d.dataset || !d.dataset.tx || !PANEL) return;
-  const k = PANEL[11] + ":" + d.dataset.tx;
-  if(d.open) TX_OPEN.add(k); else TX_OPEN.delete(k);
-}, true);
-function closePanel(){ PANEL = null; document.getElementById("cmtPanel").classList.remove("open"); }
+// Click a QA quote → scroll the transcript to it and highlight the lines.
+// Quotes are trimmed by the scorer ("…", " / " between texts, speaker tags),
+// so match on 4-word runs rather than the whole string.
+const txWords = s => String(s || "").toLowerCase().replace(/\bs\d+:/g, " ").replace(/[^a-z0-9áéíóúñü ]+/g, " ").split(/\s+/).filter(Boolean);
+function jumpToQuote(quote){
+  const pane = document.getElementById("txPane"); if(!pane) return false;
+  // One set of word-runs per sentence of the quote: a quote usually covers the
+  // setter's line and the homeowner's reply, which sit in different turns.
+  const pieces = [];
+  for(const piece of String(quote || "").split(/\.\.\.|…|\s\/\s|—|“|”|"|[.?!](?:\s|$)/)){
+    const w = txWords(piece), g = [];
+    if(w.length >= 4) for(let i = 0; i + 4 <= w.length; i++) g.push(w.slice(i, i + 4).join(" "));
+    else if(w.length >= 2) g.push(w.join(" "));
+    if(g.length) pieces.push(g);
+  }
+  pane.querySelectorAll(".tx-el.hit").forEach(e => e.classList.remove("hit"));
+  if(!pieces.length) return false;
+  const els = [...pane.querySelectorAll(".tx-el")];
+  const texts = els.map(el => " " + txWords((el.querySelector(".tx-t") || el).textContent).join(" ") + " ");
+  const count = (g, t) => g.reduce((k, x) => k + (t.includes(" " + x + " ") ? 1 : 0), 0);
+  // The line that matches the most of the whole quote anchors the rest.
+  const totals = texts.map(t => pieces.reduce((k, g) => k + count(g, t), 0));
+  const top = Math.max(...totals); if(!top) return false;
+  const anchor = totals.indexOf(top);
+  const hits = new Set([anchor]);
+  for(const g of pieces){
+    const n = texts.map(t => count(g, t)), m = Math.max(...n);
+    if(!m) continue;
+    // Several lines can share a stock phrase ("all that we ask is…"): take the one nearest the anchor.
+    let best = -1;
+    n.forEach((v, i) => { if(v === m && (best < 0 || Math.abs(i - anchor) < Math.abs(best - anchor))) best = i; });
+    hits.add(best);
+  }
+  hits.forEach(i => els[i].classList.add("hit"));
+  const first = els[Math.min(...hits)];
+  const head = first.closest(".tx-sec")?.querySelector(".tx-head");
+  pane.scrollTo({ top: Math.max(0, first.offsetTop - (head ? head.offsetHeight : 0) - 24), behavior:"smooth" });
+  return true;
+}
+document.addEventListener("click", (e)=>{
+  const q = e.target.closest && e.target.closest("#cmtPanel .qjump");
+  if(q){ const ok = jumpToQuote(q.dataset.q); q.classList.toggle("miss", !ok); return; }
+  const w = e.target.closest && e.target.closest("#txPane [data-seek]");
+  if(w){ const a = w.closest(".tx-sec")?.querySelector("audio"); if(a){ a.currentTime = Number(w.dataset.seek) || 0; a.play().catch(()=>{}); } }
+});
+function closePanel(){
+  const a = document.querySelectorAll("#cmtPanel audio"); a.forEach(x => { try{ x.pause(); }catch(e){} });
+  PANEL = null; document.getElementById("cmtPanel").classList.remove("open"); markSel();
+}
 function drawPanel(msg, isErr){
   const r = PANEL; if(!r) return;
   const p = document.getElementById("cmtPanel");
+  const wide = isAdmin() && !!r[11];
   const list = commentsOf(r).map(c => `
     <div class="cmt ${c[5]==="resolved"?"resolved":""}">
       <div class="cmt-meta"><span class="topic">${esc(c[2])}</span>
@@ -1182,25 +1273,47 @@ function drawPanel(msg, isErr){
         : `<input id="rp_${esc(c[0])}" maxlength="500" placeholder="Reply (optional)"><button class="sbtn pri" data-resolve="${esc(c[0])}">Resolve</button>`}
         <button class="sbtn" data-del="${esc(c[0])}" title="Delete this comment">Delete</button></div>` : ""}
     </div>`).join("");
+  // Keep the transcript pane as-is when it's already showing this booking.
+  const key = wide ? txKey(r[11]) : "";
+  const old = document.getElementById("txPane");
+  const keep = wide && old && old.dataset.key === key ? old : null;
+  if(keep) keep.remove();
+  p.classList.toggle("wide", wide);
   p.innerHTML = `
     <div class="cp-head" style="position:relative">
       <h3>${esc(r[3])} ${esc(r[4])}</h3>
       <div class="sub">${fmt(r[0])} · ${r[1] ? esc(S.data.agents[r[1]]||r[1]) : "Unattributed"} · ${esc(r[2])}</div>
-      <button class="cp-close" id="cpClose" title="Close">×</button>
+      <div class="cp-nav"><span class="sub" id="cpPos">${panelPos()}</span>
+        <button class="cp-step" id="cpPrev" title="Previous appointment (↑)">‹</button>
+        <button class="cp-step" id="cpNext" title="Next appointment (↓)">›</button>
+        <button class="cp-close" id="cpClose" title="Close (Esc)">×</button></div>
     </div>
-    <div class="cp-list">
-      ${detailsHtml(r)}
-      <div class="dsec"><h4>Comments</h4>${list || '<div class="cp-empty">No comments yet.</div>'}</div>
-    </div>
-    <div class="cp-form">
-      <select id="cpTopic">${TOPICS.map(t=>`<option>${t}</option>`).join("")}</select>
-      <textarea id="cpBody" maxlength="1000" placeholder="What should Manny know about this appointment?"></textarea>
-      <div style="display:flex;align-items:center;gap:10px">
-        <button class="sbtn pri" id="cpSend">Add comment</button>
-        <span class="cp-msg${isErr?" err":""}" id="cpMsg">${msg ? esc(msg) : ""}</span>
+    <div class="cp-cols">
+      <div class="cp-left">
+        <div class="cp-list">
+          ${detailsHtml(r)}
+          <div class="dsec"><h4>Comments</h4>${list || '<div class="cp-empty">No comments yet.</div>'}</div>
+        </div>
+        <div class="cp-form">
+          <select id="cpTopic">${TOPICS.map(t=>`<option>${t}</option>`).join("")}</select>
+          <textarea id="cpBody" maxlength="1000" placeholder="What should Manny know about this appointment?"></textarea>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="sbtn pri" id="cpSend">Add comment</button>
+            <span class="cp-msg${isErr?" err":""}" id="cpMsg">${msg ? esc(msg) : ""}</span>
+          </div>
+        </div>
       </div>
+      ${wide ? '<div id="txSlot"></div>' : ""}
     </div>`;
+  if(wide){
+    const slot = document.getElementById("txSlot");
+    if(keep) slot.replaceWith(keep);
+    else { const pane = document.createElement("div"); pane.id = "txPane"; pane.dataset.key = key;
+      pane.innerHTML = transcriptHtml(r); slot.replaceWith(pane); }
+  }
   document.getElementById("cpClose").onclick = closePanel;
+  document.getElementById("cpPrev").onclick = () => stepPanel(-1);
+  document.getElementById("cpNext").onclick = () => stepPanel(1);
   const cs = document.getElementById("dcSave"), cc = document.getElementById("dcClear");
   if(cs) cs.onclick = () => saveComplaint(true, cs);
   if(cc) cc.onclick = () => saveComplaint(false, cc);
@@ -1221,7 +1334,7 @@ function detailsHtml(r){
     const why = q && !isTransfer(r) ? humanize(topic==="credit" ? q[1] : q[4]) : "";
     return `<div class="qa-line"><span class="lbl">${label}</span><div>${qaPill(r, topic)}
       ${why && !/^(not asked|confirmed)$/i.test(why) ? `<span class="sub"> ${esc(why)}</span>` : ""}
-      ${quote ? `<div class="q">“${esc(quote)}”</div>` : ""}</div></div>`;
+      ${quote ? (isAdmin() ? `<button class="q qjump" data-q="${esc(quote)}" title="Show this in the transcript">“${esc(quote)}”</button>` : `<div class="q">“${esc(quote)}”</div>`) : ""}</div></div>`;
   };
   const info = ((S.data.complaint_info||{})[r[11]]) || ["",""];
   const yes = hasComplaint(r);
@@ -1249,7 +1362,6 @@ function detailsHtml(r){
       ${kv("Lead ID", esc(r[11]||""))}
     </div></div>
     <div class="dsec"><h4>Call QA</h4>${qaLine("credit","Credit")}${qaLine("home","Homeowner")}</div>
-    ${transcriptHtml(r)}
     <div class="dsec"><h4>Flags</h4>
       <div class="qa-line"><span class="lbl">Territory</span><div>${terrCell(r)}</div></div>
       <div class="qa-line"><span class="lbl">Complaint</span><div>${complaintCell(r)}
@@ -1337,7 +1449,16 @@ document.addEventListener("click", (e)=>{
   const g = e.target.closest && e.target.closest("#bulkGo");
   if(g){ e.stopPropagation(); resolveComments(g.dataset.ids.split(","), (document.getElementById("bulkReply")||{}).value || "", g); }
 }, true);
-document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closePanel(); });
+document.addEventListener("keydown", (e)=>{
+  if(e.key==="Escape"){ closePanel(); return; }
+  if(!PANEL || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+  // Leave the arrows alone while typing or using a control or the player.
+  const t = e.target, tag = t && t.tagName;
+  if(tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "AUDIO" || (t && t.isContentEditable)) return;
+  const qm = document.getElementById("qaMenu");
+  if((qm && qm.style.display && qm.style.display !== "none") || document.getElementById("hfPop")) return;
+  e.preventDefault(); stepPanel(e.key === "ArrowDown" ? 1 : -1);
+});
 
 // Appointments Manny added by hand (leads.cc_appt_manual) carry a MANUAL id.
 const isManual = r => /^MANUAL/.test(String(r[11]||""));
