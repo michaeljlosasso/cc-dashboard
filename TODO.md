@@ -157,6 +157,8 @@ book us more appointments."
       interested, Out of area, Wrong product, Other); note = buyer feedback; both visible to agents.
       Flagged 18 GES complaints from GES customer service (8 Credit, 5 Didn't show, 4 Other, 1 Not interested).
 
+- [x] **Refresh keeps the tab** (Nov 19 2026): the shell reopens the tab named in the URL hash (`#appointments`, `#hours`, `#payouts`…) on load and on hash change; unknown hash → Commission. Before, only `#hours` was honored and everything else reset to the first tab.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

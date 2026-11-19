@@ -262,6 +262,8 @@ NAV_SECTIONS.forEach(sec => {
     b.className = "item";
     b.innerHTML = `${ICONS[item.icon] || ""}<span>${item.label}</span>${item.soon ? '<span class="soon">SOON</span>' : ""}`;
     b.onclick = () => select(item, b, sec.color);
+    // Remembered so a refresh can reopen this tab from the URL hash.
+    item._btn = b; item._color = sec.color; item._sec = el;
     items.appendChild(b);
     if (!item.soon && !activeBtn) { activeBtn = b; }
   });
@@ -331,16 +333,22 @@ function select(item, btn, secColor){
   // frame we're actually showing, not some other window that knows the shape.
   currentFrame = holder.querySelector("iframe");
   // Slug from the label, not the path — external widget URLs made ugly hashes.
-  try { history.replaceState(null, "", "#" + item.label.toLowerCase().replace(/\W+/g, "-")); } catch(_){}
+  try { history.replaceState(null, "", "#" + slug(item.label)); } catch(_){}
 }
 
-// initial page — honor #hours deep link
-const wantHours = location.hash.includes("hours");
-const first = wantHours
-  ? { item: NAV_SECTIONS[0].items[1], idx: 1 }
-  : { item: NAV_SECTIONS[0].items[0], idx: 0 };
-const btns = nav.querySelectorAll(".item");
-select(first.item, btns[first.idx], NAV_SECTIONS[0].color);
+// Initial page: reopen the tab named in the URL hash (select() writes it, e.g.
+// #appointments), so a refresh stays on the same tab. Falls back to the first tab.
+const slug = label => label.toLowerCase().replace(/\W+/g, "-");
+const wanted = decodeURIComponent(location.hash.slice(1));
+const all = NAV_SECTIONS.flatMap(sec => sec.items).filter(it => !it.soon && it.path && it._btn);
+const first = (wanted && all.find(it => slug(it.label) === wanted)) || all[0];
+if (first._sec) first._sec.classList.remove("closed");   // make sure its section is open
+select(first, first._btn, first._color);
+// A hash typed or pasted into the address bar (no reload) switches tabs too.
+window.addEventListener("hashchange", () => {
+  const it = all.find(x => slug(x.label) === decodeURIComponent(location.hash.slice(1)));
+  if (it && !it._btn.classList.contains("active")) { if (it._sec) it._sec.classList.remove("closed"); select(it, it._btn, it._color); }
+});
 
 document.getElementById("burger").onclick = () =>
   document.getElementById("sidebar").classList.toggle("collapsed");
