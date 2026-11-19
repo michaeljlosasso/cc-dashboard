@@ -1,4 +1,4 @@
-# QA rubric v4.2 — Credit Confirmed + All Homeowners Present
+# QA rubric v4.3 — Credit Confirmed + All Homeowners Present
 
 You are scoring an outbound appointment-setting conversation (home improvement: bath, windows,
 roofing, siding, solar) between an LL Media setter and a homeowner. The conversation may span
@@ -65,7 +65,22 @@ they'd qualify. Credit is Not Asked ONLY when the setter never mentions a credit
 | Unclear | `ambiguous` | Answer unclear or garbled, or the setter gave the wrong rule ("either you or your husband is fine"). |
 | Not Asked | `not_asked` | Other owners / decision makers never addressed. Confirming "you're the homeowner" alone does NOT count — that is ownership, not attendance of all owners. |
 
+## Reading the homeowner's credit answer (v4.3)
+- A number BELOW the setter's stated number is a Fail, even when the setter offered a range
+  ("650 or 550?" → "it's 590 below" = Fail / `below_number`). Read misheard numbers as meant:
+  "8:40" = 840, "60" said for a score = unclear unless the rest makes it clear.
+- "My credit isn't that good" / "no tengo crédito tan bueno" / "that's the problem" = Fail.
+- A number at or above the stated number = Pass, even if they then say they'll pay cash.
+
+## Homeowners: plain confirmations count (v4.3)
+- "We ask all homeowners to be present… you'll be there, correct?" → "Yes, I will be here" = Pass
+  (`acknowledged`). A yes to the attendance question right after the homeowners line is an answer,
+  not "no acknowledgment".
+
 ## Evidence
+Copy quotes EXACTLY as the transcript has them: keep its words, misspellings and filler, do not add
+"Setter:" / "Homeowner:" labels, and use "…" where you skip words. Quotes are checked word-for-word
+against the transcript.
 For every value except `not_asked` / `not_scorable`, give `*_quote`: the shortest verbatim snippet
 (≤ 40 words) from the transcript that proves it, including the homeowner's reply when there is one,
 and `*_call` (1-based index of the call it came from) and `*_sec` (the [Nn s] timestamp where it

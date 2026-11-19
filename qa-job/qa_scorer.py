@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-RUBRIC_VERSION = "v4.2"  # v4.2 (Oct 30): any mention of the credit score = at least Unclear. v4.1 (Oct 30): stated number + any question after it = asked (financing question counts). v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
+RUBRIC_VERSION = "v4.3"  # v4.3 (Nov 19): stronger quote check; an unverified Fail stays Fail. v4.2 (Oct 30): any mention of the credit score = at least Unclear. v4.1 (Oct 30): stated number + any question after it = asked (financing question counts). v3: any yes to credit = Pass (hedged too). v4 (Oct 20): stated-only / unanswered = Not Asked (QA spiff)
 RUBRIC_PATH = Path(__file__).with_name("qa_rubric.md")
 SMS_RUBRIC_PATH = Path(__file__).with_name("qa_rubric_sms.md")
 PROVIDER = os.environ.get("QA_PROVIDER", "openai")          # "openai" (gpt-5, same key as the Leadspedia analyzer) or "anthropic"
@@ -132,30 +132,42 @@ def parse_response(text: str) -> dict[str, Any]:
 _TS_RE = re.compile(r"\[S\d+ \d+s\]|\[TEXT \d+ · [^\]]*\]")
 
 
-_ROLE_RE = re.compile(r"\b(?:SETTER|BOT|AUTO|HOMEOWNER)\s*:")
+# Speaker labels the model sometimes adds to a quote ("Setter:", "Homeowner:", "S1:") and the
+# thread labels in the prompt. Stripped on both sides, any case (v4.3: the scorer was quoting
+# 'Setter: "…" Homeowner: "…"' and every such quote failed the check).
+_ROLE_RE = re.compile(r"(?i)\b(?:setter|bot|auto|homeowner|customer|agent|caller|speaker\s*\d+|s\d+)\s*:")
+_FILLER = {"uh", "um", "uhm", "erm", "mhm", "hmm"}
 
 
 def _norm(text: str) -> list[str]:
-    text = _ROLE_RE.sub(" ", _TS_RE.sub(" ", text or "")).lower().replace("...", " ").replace("/", " ")
-    return re.sub(r"[^a-z0-9áéíóúñü ]", "", text).split()
+    text = _ROLE_RE.sub(" ", _TS_RE.sub(" ", text or "")).lower()
+    text = re.sub(r"[‘’']", "", text)          # it's / it’s -> its on both sides
+    return [w for w in re.sub(r"[^a-z0-9áéíóúñü]+", " ", text).split() if w not in _FILLER]
 
 
-def quote_in_transcript(quote: str | None, transcript_text: str, min_hit: float = 0.7) -> bool:
-    """True if ≥70% of the quote's 4-word windows appear verbatim in the (normalised) transcript."""
+def quote_in_transcript(quote: str | None, transcript_text: str, min_hit: float = 0.6) -> bool:
+    """True if ≥60% of the quote's word-runs appear verbatim in the (normalised) transcript.
+
+    The quote is split where the model skipped or joined text (… / " — " / quote marks), and
+    each piece is checked on its own: 4-word runs for longer pieces, the whole piece for a
+    2–3 word reply ("Oh, yeah."). Filler words (uh, um) are ignored on both sides because the
+    model tidies them out. Tested Nov 19 2026 on 22 real quotes the old check rejected (20 now
+    pass; the 2 left really were paraphrased) and on 608 quotes from other calls (2 false
+    matches, both a setter's stock line that appears on many of his calls).
+    """
     if not quote:
         return True
-    full = " ".join(_norm(transcript_text))
-    # An ellipsis in the quote means "text skipped here" (v3): check each piece on its own so
-    # 4-word windows never straddle the gap. Before this, a correctly trimmed quote could
-    # fail verification and get downgraded to Unclear/garbled.
+    full = " " + " ".join(_norm(transcript_text)) + " "
     grams: list[str] = []
-    for piece in re.split(r"\.\.\.|\u2026", quote):
+    for piece in re.split(r"\.\.\.|…|\s[—–-]\s|\s/\s|[\"“”]", quote):
         words = _norm(piece)
-        if words:
-            grams += [" ".join(words[i:i + 4]) for i in range(max(1, len(words) - 3))]
+        if len(words) >= 4:
+            grams += [" ".join(words[i:i + 4]) for i in range(len(words) - 3)]
+        elif len(words) >= 2:
+            grams.append(" ".join(words))
     if not grams:
         return False
-    return sum(g in full for g in grams) / len(grams) >= min_hit
+    return sum((" " + g + " ") in full for g in grams) / len(grams) >= min_hit
 
 
 def verify(result: dict[str, Any], appt: Appointment) -> dict[str, Any]:
@@ -166,8 +178,13 @@ def verify(result: dict[str, Any], appt: Appointment) -> dict[str, Any]:
     out["review_reason"] = None
     for f in ("credit", "homeowners"):
         if out.get(f) in ("Pass", "Fail", "Unclear") and not quote_in_transcript(out.get(f"{f}_quote"), text):
-            out[f] = "Unclear"
-            out[f"{f}_reason"] = "garbled" if f == "credit" else "ambiguous"
+            # v4.3 (Manny, Nov 19 2026): an unverified quote must never make a score BETTER.
+            # A Pass we can't verify drops to Unclear (don't pay for a yes we can't see), but a
+            # Fail stays a Fail and is flagged; it used to become Unclear and pay $1 for a
+            # homeowner who said "590" (Travis Crouse, Nov 18).
+            if out.get(f) == "Pass":
+                out[f] = "Unclear"
+                out[f"{f}_reason"] = "garbled" if f == "credit" else "ambiguous"
             out["needs_review"] = True
             out["review_reason"] = (out["review_reason"] or "") + f"{f} quote not found in transcript; "
     if out.get("credit") == "Fail" or out.get("homeowners") == "Fail":

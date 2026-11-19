@@ -159,6 +159,8 @@ book us more appointments."
 
 - [x] **Refresh keeps the tab** (Nov 19 2026): the shell reopens the tab named in the URL hash (`#appointments`, `#hours`, `#payouts`…) on load and on hash change; unknown hash → Commission. Before, only `#hours` was honored and everything else reset to the first tab.
 
+- [x] **QA v4.3** (Nov 19 2026): quote check fixed; an unverified No stays No (was turning into Unclear and paying $1). Details in qa-job/README.md. ~11 older rows since Oct 19 were downgraded by the old check; not re-scored (needs Manny OK).
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

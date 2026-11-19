@@ -71,3 +71,20 @@ as unclear… where they don't mention it at all, it's not payable."
 - Dry run: Abel Aguilar → Unclear/stated_only; Paul Woods → Not Asked (cut off before the number);
   Sharon Martin → Unclear.
 - New scores only. Rows scored before keep their rubric_version.
+
+## v4.3 — quote check fixed; an unverified No stays No (Nov 19 2026, Manny)
+Image `v4-3-20261119184430` (live). Trigger: Travis Crouse (Felix, Nov 18) said his score was
+"590 below" against 650 and showed **Unclear**. The model had scored it Fail, but its quote
+('Setter: "…" Homeowner: "…"', filler removed) failed the word-for-word check, and a failed check
+turned every score into Unclear — so a No paid $1.
+- `quote_in_transcript`: strips speaker labels in any case, ignores uh/um and apostrophes, splits on
+  … / — / quote marks, checks 2–3 word replies whole, threshold 0.7 → 0.6. On the 22 real quotes the
+  old check rejected since Oct 19, 20 now pass; on 608 quotes from other calls, 2 false matches
+  (a setter's stock line).
+- `verify`: an unverified **Pass** still drops to Unclear; an unverified **Fail stays Fail** (flagged for review).
+- Rubric: a number below the stated one is Fail even when the setter offered a range; "my credit
+  isn't good" = Fail; "you'll be there, correct?" → "Yes, I will be here" = homeowners Pass;
+  quotes must be copied exactly with no speaker labels.
+- Dry run before deploy (no writes): Travis → Fail / homeowners Pass; Felix's Spanish call (Oct 23)
+  → Fail; 6 others that were Unclear only because of the check → Pass.
+- New scores only. Older rows keep their rubric_version. Travis corrected by hand in cc_qa_override.
