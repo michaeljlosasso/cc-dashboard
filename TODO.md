@@ -161,6 +161,8 @@ book us more appointments."
 
 - [x] **QA v4.3** (Nov 19 2026): quote check fixed; an unverified No stays No (was turning into Unclear and paying $1). Details in qa-job/README.md. ~11 older rows since Oct 19 were downgraded by the old check; not re-scored (needs Manny OK).
 
+- [x] **No pay flag** (Nov 19 2026, Manny): admin marks one booking "no pay" from the drawer (Flags → Pay) with a reason + private note. It pays nothing — no set pay, no spiff, no QA points, no team-goal credit — in Commission, Spiffs and Payouts (`SpiffRules.payableRows` + `no_pay` in the payload, table `leads.cc_pay_exclude`, endpoint `/api/no-pay`). Row shows a "No pay" tag; agents see the tag and reason, not the note. First use: Travis Crouse (Felix, Nov 18, 590 credit, Twist & Spout complaint) → Felix's Nov 16 week $40 → $30. "Pay it again" clears it.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

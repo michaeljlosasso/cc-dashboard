@@ -518,6 +518,17 @@ FROM \`${PROJECT}.leads.cc_complaint_flag\` WHERE has_complaint
 `;
 const COMPLAINT_REASONS = ["Credit", "Didn't show", "Not interested", "Out of area", "Wrong product", "Other"];
 
+// No pay (Manny, Nov 19 2026): a booking he marks "no pay" earns nothing —
+// no set pay, no spiff, no QA points, no team-goal credit — for any week.
+// First use: Travis Crouse (Nov 18), said "590" on the call and was booked
+// anyway; the buyer complained. The pay rule itself is payableRows() in
+// spiff-rules.js. Everyone sees the flag and reason; the note is admin-only.
+const SQL_NO_PAY = `
+SELECT lead_id, IFNULL(reason,'') AS reason, IFNULL(note,'') AS note
+FROM \`${PROJECT}.leads.cc_pay_exclude\`
+`;
+const NO_PAY_REASONS = ["Bad credit, booked anyway", "Not the homeowner", "Owner won't be there", "Buyer complaint", "Duplicate", "Other"];
+
 // Territory (Manny, Oct 20 2026): every appointment is in territory unless he
 // flags it out from the admin view. Display only — never changes pay.
 const SQL_TERRITORY = `
@@ -653,7 +664,7 @@ async function buildPayload(env, admin) {
   // Prefer setter-map attribution; fall back to phone-match-only if the
   // appt_setter_map table doesn't exist yet.
   const apptsPromise = bq(env, SQL_APPTS_V2).catch(() => bq(env, SQL_APPTS));
-  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments, complaints, apptDemos] = await Promise.all([
+  const [appts, hours, agents, meta, spiffs, config, breaks, windows, apptQa, apptSms, qaOverride, spiffTypes, territory, apptManual, comments, complaints, apptDemos, noPay] = await Promise.all([
     apptsPromise,
     bq(env, SQL_HOURS),
     bq(env, SQL_AGENTS),
@@ -671,6 +682,7 @@ async function buildPayload(env, admin) {
     bq(env, SQL_COMMENTS).catch(() => ({ rows: [] })),
     bq(env, SQL_COMPLAINTS).catch(() => ({ rows: [] })),
     admin ? bq(env, SQL_APPT_DEMOS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    bq(env, SQL_NO_PAY).catch(() => ({ rows: [] })),
   ]);
 
   const agentMap = {};
@@ -735,6 +747,11 @@ async function buildPayload(env, admin) {
     // lead_id -> [reason, note] for flagged complaints (everyone sees it —
     // it's the buyer's feedback on the booking).
     complaint_info: Object.fromEntries(complaints.rows.map((r) => [r[0], [r[1], r[2]]])),
+    // Lead IDs Manny marked "no pay" (pay nothing for any week). Everyone gets the
+    // list — the Commission tab computes pay in the browser and must agree with Payouts.
+    no_pay: noPay.rows.map((r) => r[0]),
+    no_pay_reason: Object.fromEntries(noPay.rows.map((r) => [r[0], r[1]])),
+    ...(admin ? { no_pay_note: Object.fromEntries(noPay.rows.filter((r) => r[2]).map((r) => [r[0], r[2]])) } : {}),
     // Lead IDs flagged out of territory (everyone sees the flag; note is admin-only).
     out_territory: territory.rows.map((r) => r[0]),
     ...(admin ? { out_territory_note: Object.fromEntries(territory.rows.filter((r) => r[1]).map((r) => [r[0], r[1]])) } : {}),
@@ -1048,6 +1065,29 @@ async function handleAdmin(request, env, url, adminSess) {
   }
 
   /* Customer complaint flag (admin). true flags it; false clears it. */
+  /* No pay: mark a booking as paying nothing (admin). no_pay=false clears it. */
+  if (url.pathname === "/api/no-pay") {
+    const id = String(body.lead_id || "");
+    if (!/^[A-Za-z0-9]{6,16}$/.test(id)) throw new Error("bad lead id");
+    if (typeof body.no_pay !== "boolean") throw new Error("no_pay must be true or false");
+    if (!body.no_pay) {
+      await bq(env, `DELETE FROM \`${PROJECT}.leads.cc_pay_exclude\` WHERE lead_id = '${id}'`);
+    } else {
+      const reason = String(body.reason || "");
+      if (reason && !NO_PAY_REASONS.includes(reason)) throw new Error("unknown reason");
+      const note = String(body.note || "");
+      await bq(env, `
+        MERGE \`${PROJECT}.leads.cc_pay_exclude\` t
+        USING (SELECT '${id}' AS lead_id) s ON t.lead_id = s.lead_id
+        WHEN MATCHED THEN UPDATE SET reason = ${reason ? sqlStr(reason, 60) : "NULL"}, note = ${note ? sqlStr(note, 500) : "NULL"}, updated_at = CURRENT_TIMESTAMP()
+        WHEN NOT MATCHED THEN INSERT (lead_id, reason, note, updated_at)
+          VALUES (s.lead_id, ${reason ? sqlStr(reason, 60) : "NULL"}, ${note ? sqlStr(note, 500) : "NULL"}, CURRENT_TIMESTAMP())
+      `);
+    }
+    await bustDataCache(url);
+    return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+  }
+
   if (url.pathname === "/api/complaint") {
     const id = String(body.lead_id || "");
     if (!/^[A-Za-z0-9]{6,16}$/.test(id)) throw new Error("bad lead id");
@@ -1306,7 +1346,7 @@ export default {
          || path === "/api/hours-adjust" || path === "/api/hours-adjust/delete"
          || path === "/api/qa-override" || path === "/api/territory"
          || path === "/api/comment/resolve" || path === "/api/comment/delete"
-         || path === "/api/complaint"
+         || path === "/api/complaint" || path === "/api/no-pay"
          || path === "/api/admin/payroll") && request.method === "POST") {
       if (!authed) {
         return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });

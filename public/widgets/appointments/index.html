@@ -751,7 +751,7 @@ function tableCard(rows){
     <tr class="${[d?"dup":"", inTerritory(r)?"":"oot", hasComplaint(r)?"cmpl":"", qaNo(r)?"qano":"", (PANEL && r[11] && PANEL[11]===r[11])?"sel":""].join(" ").trim()}"${r[11] ? ` data-row="${esc(r[11])}"` : ""}>
       <td class="mono">${fmt(r[0])}${r[12] ? `<br><span class="sub">${clock(r[12])}</span>` : ""}</td>
       <td class="agent-name">${r[1] ? esc(S.data.agents[r[1]]||r[1]) : '<span class="sub">Unattributed</span>'}</td>
-      <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${reviewTag(r)}${cmtBtn(r)}</td>
+      <td><span class="lead-name">${esc(r[3])} ${esc(r[4])}</span>${tag}${isManual(r) ? '<span class="man-tag" title="Added by hand — not in Leadspedia">Manual</span>' : ""}${noPayTag(r)}${reviewTag(r)}${cmtBtn(r)}</td>
       <td>${snCell(r)}</td>
       <td>${qaPill(r,"credit")}</td>
       <td>${qaPill(r,"home")}</td>
@@ -805,7 +805,7 @@ function tableCard(rows){
 function exportCsv(rows){
   const cell = v => { v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
   const label = (r,t) => { const k = qaVal(r,t); return k==="none" ? (isTransfer(r) ? "Transfer" : "Not scored") : QA_OUT[k].txt; };
-  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Same / Next","Credit","Homeowner","In Territory","Complaint",...(isAdmin()?["Demo","Demo Basis","Advertiser Disposition","Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
+  const head = ["Comments","Booked","Booked Time (ET)","Setter","First","Last","Same / Next","Credit","Homeowner","In Territory","Complaint","Pays",...(isAdmin()?["Demo","Demo Basis","Advertiser Disposition","Channel"]:[]),"Needs Review","Phone","Email","Campaign","City","State",
                 "Appointment","Duplicate","Credit Reason","Credit Quote","Homeowner Reason","Homeowner Quote","Review Reason","Lead ID"];
   const lines = [head.join(",")];
   for(const r of rows){
@@ -813,7 +813,7 @@ function exportCsv(rows){
     lines.push([
       commentsOf(r).map(c => `[${c[2]}${c[5]==="resolved"?" · resolved":""}] ${c[3]}${c[6] ? ` → ${c[6]}` : ""}`).join(" | "),
       r[0], r[12] ? String(r[12]).slice(11,16) : "", r[1] ? (S.data.agents[r[1]]||r[1]) : "Unattributed", r[3], r[4],
-      snText(r), label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", ...(isAdmin()?[DEMO_TXT[demoOf(r)[0]], demoOf(r)[1], demoOf(r)[2], channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
+      snText(r), label(r,"credit"), label(r,"home"), inTerritory(r) ? "Yes" : "No", hasComplaint(r) ? "Yes" : "No", isNoPay(r) ? "No" + (noPayWhy(r) ? " — " + noPayWhy(r) : "") : "Yes", ...(isAdmin()?[DEMO_TXT[demoOf(r)[0]], demoOf(r)[1], demoOf(r)[2], channel(r)==="sms"?"SMS":"Call"]:[]), q && q[6] ? "Yes" : "",
       r[8], r[9], r[2], r[5], r[6], r[10] || "",
       d ? (d.agents.size>1 ? "Cross-setter" : "Duplicate") : "",
       q ? humanize(q[1]) : "", q ? q[2] : "", q ? humanize(q[4]) : "", q ? q[5] : "",
@@ -1181,7 +1181,7 @@ async function loadTranscript(lead){
 const TX_STATUS = { APPTBK:"Booked", CALLBK:"Callback", AL:"Voicemail", LTMGAD:"Left message", DQ:"Disqualified", RECYLE:"Recycle", REBOOK:"Rebook", DNC:"Do not call" };
 const TX_ROLE = { human:["Setter","us"], closebot:["AI bot","bot"], app_other:["AI bot","bot"], revive:["AI bot","bot"],
                   workflow:["Auto","bot"], missed_call_textback:["Auto","bot"], homeowner:["Homeowner",""] };
-const mmss = s => `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,"0")}`;
+const mmss = s => { s = Math.floor(s); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };   // floor, or 119.6s shows "1:60"
 const txWhen = dt => dt ? `${fmt(dt.slice(0,10))} · ${clock(dt)}` : "";
 // What the right-hand pane is showing; it's only rebuilt when this changes,
 // so saving a comment doesn't reset the scroll or stop the recording.
@@ -1316,6 +1316,9 @@ function drawPanel(msg, isErr){
   document.getElementById("cpNext").onclick = () => stepPanel(1);
   const cs = document.getElementById("dcSave"), cc = document.getElementById("dcClear");
   if(cs) cs.onclick = () => saveComplaint(true, cs);
+  const ns = document.getElementById("npSave"), nc = document.getElementById("npClear");
+  if(ns) ns.onclick = () => saveNoPay(true, ns);
+  if(nc) nc.onclick = () => saveNoPay(false, nc);
   if(cc) cc.onclick = () => saveComplaint(false, cc);
   document.getElementById("cpSend").onclick = sendComment;
   p.querySelectorAll("[data-resolve]").forEach(b => b.onclick = () =>
@@ -1367,7 +1370,50 @@ function detailsHtml(r){
       <div class="qa-line"><span class="lbl">Complaint</span><div>${complaintCell(r)}
         ${yes && (info[0] || info[1]) ? `<div style="margin-top:4px"><b>${esc(info[0])}</b>${info[0] && info[1] ? " — " : ""}${esc(info[1])}</div>` : ""}</div></div>
       ${editor}
+      <div class="qa-line"><span class="lbl">Pay</span><div>${isNoPay(r)
+        ? `<span class="terr out">No pay</span>${noPayWhy(r) ? `<div style="margin-top:4px"><b>${esc(noPayWhy(r))}</b>${isAdmin() && (S.data.no_pay_note||{})[r[11]] ? " — " + esc(S.data.no_pay_note[r[11]]) : ""}</div>` : ""}`
+        : '<span class="terr in">Pays</span>'}</div></div>
+      ${noPayEditor(r)}
     </div>`;
+}
+/* ---- No pay (Manny, Nov 19 2026) ----
+ * Manny can mark one booking as paying nothing — no set pay and no spiff —
+ * e.g. it was booked after the homeowner said their credit was bad and the
+ * buyer complained. The pay rule is SpiffRules.payableRows (shared with
+ * Commission, Spiffs and Payouts). Everyone sees the flag and the reason.
+ */
+const NO_PAY_REASONS = ["Bad credit, booked anyway", "Not the homeowner", "Owner won't be there", "Buyer complaint", "Duplicate", "Other"];
+const isNoPay = r => !!(r[11] && (S.data.no_pay || []).includes(r[11]));
+const noPayWhy = r => (S.data.no_pay_reason || {})[r[11]] || "";
+const noPayTag = r => isNoPay(r) ? `<span class="dup-tag" title="Pays nothing${noPayWhy(r) ? ": " + esc(noPayWhy(r)) : ""}">No pay</span>` : "";
+function noPayEditor(r){
+  if(!isAdmin() || !r[11]) return "";
+  const on = isNoPay(r), why = noPayWhy(r), note = (S.data.no_pay_note || {})[r[11]] || "";
+  return `<div class="cedit">
+      <select id="npReason">${['<option value="">Reason…</option>'].concat(NO_PAY_REASONS.map(x=>`<option${x===why?" selected":""}>${esc(x)}</option>`)).join("")}</select>
+      <input id="npNote" maxlength="500" placeholder="Note (only you see this)" value="${esc(note)}">
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="sbtn ${on ? "" : "pri"}" id="npSave">${on ? "Save" : "Don't pay for this booking"}</button>
+        ${on ? '<button class="sbtn" id="npClear">Pay it again</button>' : ""}
+        <span class="cp-msg" id="npMsg"></span>
+      </div>
+    </div>`;
+}
+async function saveNoPay(flag, btn){
+  const lead = PANEL[11], msg = document.getElementById("npMsg");
+  const reason = (document.getElementById("npReason")||{}).value || "";
+  const note = ((document.getElementById("npNote")||{}).value || "").trim();
+  btn.disabled = true; if(msg) msg.textContent = "Saving…";
+  try{
+    await post("/api/no-pay", flag ? { admin:"session", lead_id: lead, no_pay: true, reason, note }
+                                   : { admin:"session", lead_id: lead, no_pay: false });
+    const list = new Set(S.data.no_pay || []);
+    S.data.no_pay_reason = S.data.no_pay_reason || {}; S.data.no_pay_note = S.data.no_pay_note || {};
+    if(flag){ list.add(lead); S.data.no_pay_reason[lead] = reason; if(note) S.data.no_pay_note[lead] = note; else delete S.data.no_pay_note[lead]; }
+    else { list.delete(lead); delete S.data.no_pay_reason[lead]; delete S.data.no_pay_note[lead]; }
+    S.data.no_pay = [...list];
+    render(); drawPanel(flag ? "Marked no pay. It's out of Commission, Spiffs and Payouts." : "It pays again.");
+  }catch(e){ btn.disabled = false; if(msg){ msg.textContent = "Didn't save: " + (e.message||e); msg.className = "cp-msg err"; } }
 }
 async function saveComplaint(flag, btn){
   const lead = PANEL[11], msg = document.getElementById("dcMsg");

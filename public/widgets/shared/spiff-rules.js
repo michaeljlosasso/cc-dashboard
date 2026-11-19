@@ -51,10 +51,17 @@
     const out = (ctx && ctx.out_territory) || [];
     return out.indexOf(r[11]) !== -1;
   }
+  // "No pay" (Manny, Nov 19 2026): a booking he marks by hand pays nothing,
+  // any week — first used for a 590-credit booking the buyer complained about.
+  function noPay(r, ctx) {
+    return !!(r && r[11] && ((ctx && ctx.no_pay) || []).indexOf(r[11]) !== -1);
+  }
+  // The bookings that earn anything. Every pay screen filters through this.
   function payableRows(rows, ctx) {
     const out = new Set((ctx && ctx.out_territory) || []);
-    if (!out.size) return rows || [];
-    return (rows || []).filter((r) => !(r[11] && r[A_DATE] >= OOT_UNPAID_FROM && out.has(r[11])));
+    const none = new Set((ctx && ctx.no_pay) || []);
+    if (!out.size && !none.size) return rows || [];
+    return (rows || []).filter((r) => !(r[11] && (none.has(r[11]) || (r[A_DATE] >= OOT_UNPAID_FROM && out.has(r[11])))));
   }
 
   const RULES = {
@@ -156,5 +163,5 @@
   // (src/index.js) and reads globalThis.SpiffRules for the owner Payouts view.
   (typeof window !== "undefined" ? window : globalThis).SpiffRules =
     { RULES, windowFor, stackFor, evaluate, goalLine, isTransfer, qaValue, QA_POINTS,
-      OOT_UNPAID_FROM, payableRows, unpaidOot };
+      OOT_UNPAID_FROM, payableRows, unpaidOot, noPay };
 })();
