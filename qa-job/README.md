@@ -88,3 +88,7 @@ turned every score into Unclear — so a No paid $1.
 - Dry run before deploy (no writes): Travis → Fail / homeowners Pass; Felix's Spanish call (Oct 23)
   → Fail; 6 others that were Unclear only because of the check → Pass.
 - New scores only. Older rows keep their rubric_version. Travis corrected by hand in cc_qa_override.
+- **Re-score done Nov 19 2026** (Manny OK'd): the 22 bookings since Oct 19 whose latest score said
+  "quote not found" were re-scored with v4.3 and appended (old rows kept; the dashboard reads the
+  newest). QA spiff weeks moved: Oct 19 wk Jon +3, Oscar +2 (Lillian Best + Michael Burwell, already
+  paid by hand Oct 30), Bernardo −1; Oct 26 wk Jon +1, Oscar +1, Felix +1.
