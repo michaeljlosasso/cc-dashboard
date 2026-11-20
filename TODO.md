@@ -163,6 +163,8 @@ book us more appointments."
 
 - [x] **No pay flag** (Nov 19 2026, Manny): admin marks one booking "no pay" from the drawer (Flags → Pay) with a reason + private note. It pays nothing — no set pay, no spiff, no QA points, no team-goal credit — in Commission, Spiffs and Payouts (`SpiffRules.payableRows` + `no_pay` in the payload, table `leads.cc_pay_exclude`, endpoint `/api/no-pay`). Row shows a "No pay" tag; agents see the tag and reason, not the note. First use: Travis Crouse (Felix, Nov 18, 590 credit, Twist & Spout complaint) → Felix's Nov 16 week $40 → $30. "Pay it again" clears it.
 
+- [x] **Sale column** (Nov 20 2026, Manny): everyone sees "Yes" + a soft-green row when the contractor's report (`dispositions.appointment_demos`, `sold`) marks the booking sold. Matched in the Worker with the Demo SQL (phone, email for Venture; nearest entry_date within 45 days); each contractor record credits one booking (nearest), so a duplicate booking doesn't show two sales. Agents get only the `sold` lead-ID list — no revenue, no disposition text. HomeFix + Elevated Remodeling added to the matching (Demo column too). Green wins over the pink flag colors. Header filter, sortable, in export and drawer. Pella / Long Home can't match (no phone/email in their feeds). Display only.
+
 ## Parked
 
 - [x] GitHub repo created and pushed (michaeljlosasso/cc-dashboard, main)

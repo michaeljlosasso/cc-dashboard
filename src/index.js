@@ -476,13 +476,14 @@ FROM \`${PROJECT}.leads.cc_appt_comments\`
 ORDER BY created_at
 `;
 
-// ADMIN ONLY, display only — never feeds payroll (Manny, Oct 25 2026, "1.0").
+// Demo details are ADMIN ONLY; the sold yes/no goes to everyone for the Sale
+// column (Nov 20 2026). Display only — never feeds payroll (Manny, Oct 25 2026, "1.0").
 // Did the appointment actually demo? From dispositions.appointment_demos (a
 // read-only view over the advertisers' disposition loads). No shared lead id,
 // so: scope by advertiser from our campaign name, match phone (last 10 digits),
 // email when the feed has no phone (Venture), and take the advertiser record
-// nearest the booking date (within 45 days). Only GES, Clear Day, Venture and
-// American Standard can join; Pella and Long Home send no contact fields, and
+// nearest the booking date (within 45 days). GES, Clear Day, Venture, American
+// Standard, HomeFix and Elevated Remodeling can join; Pella and Long Home send no contact fields, and
 // Renuity isn't booked by this team. Anything unmatched shows "No data".
 const SQL_APPT_DEMOS = `
 WITH l AS (
@@ -494,20 +495,32 @@ WITH l AS (
            WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^clear day') THEN 'clear_day'
            WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^venture') THEN 'venture_solar'
            WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^(american standard|as wt)') THEN 'american_standard'
+           -- added Nov 20 2026 when the dispositions view gained these two feeds
+           WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^homefix') THEN 'homefix'
+           WHEN REGEXP_CONTAINS(LOWER(campaignName), r'^elevated remodeling') THEN 'elevated_remodeling'
          END AS adv
   FROM \`${PROJECT}.leads.leads_get_all\`
   WHERE affiliateID = 212 AND IFNULL(isTest,'No') != 'Yes' AND createdOnDate >= '2026-01-01'
+),
+m AS (
+  SELECT l.leadID, d.demo_status, IFNULL(d.demo_basis,'') AS basis, IFNULL(d.disposition,'') AS disposition,
+         IFNULL(FORMAT_DATETIME('%Y-%m-%d %H:%M', d.appointment_at),'') AS appt_at, d.advertiser,
+         IFNULL(d.sold, FALSE) AS sold, d.advertiser_id, d.record_id,
+         ABS(DATE_DIFF(d.entry_date, l.d, DAY)) AS gap
+  FROM l
+  JOIN \`${PROJECT}.dispositions.appointment_demos\` d
+    ON d.advertiser_id = l.adv
+   AND ( (IFNULL(d.phone,'') != '' AND LENGTH(l.ph) = 10 AND RIGHT(d.phone,10) = l.ph)
+      OR (IFNULL(d.phone,'') = '' AND IFNULL(d.email,'') != '' AND l.em != '' AND LOWER(TRIM(d.email)) = l.em) )
+   AND ABS(DATE_DIFF(d.entry_date, l.d, DAY)) <= 45
+  WHERE l.adv IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY l.leadID ORDER BY gap, d.record_id) = 1
 )
-SELECT l.leadID, d.demo_status, IFNULL(d.demo_basis,'') AS basis, IFNULL(d.disposition,'') AS disposition,
-       IFNULL(FORMAT_DATETIME('%Y-%m-%d %H:%M', d.appointment_at),'') AS appt_at, d.advertiser
-FROM l
-JOIN \`${PROJECT}.dispositions.appointment_demos\` d
-  ON d.advertiser_id = l.adv
- AND ( (IFNULL(d.phone,'') != '' AND LENGTH(l.ph) = 10 AND RIGHT(d.phone,10) = l.ph)
-    OR (IFNULL(d.phone,'') = '' AND IFNULL(d.email,'') != '' AND l.em != '' AND LOWER(TRIM(d.email)) = l.em) )
- AND ABS(DATE_DIFF(d.entry_date, l.d, DAY)) <= 45
-WHERE l.adv IS NOT NULL
-QUALIFY ROW_NUMBER() OVER (PARTITION BY l.leadID ORDER BY ABS(DATE_DIFF(d.entry_date, l.d, DAY)), d.record_id) = 1
+-- One contractor record credits ONE booking: when the same person was booked
+-- twice, the sale/demo goes to the booking nearest the contractor's date.
+SELECT leadID, demo_status, basis, disposition, appt_at, advertiser, sold
+FROM m
+QUALIFY ROW_NUMBER() OVER (PARTITION BY advertiser_id, record_id ORDER BY gap, leadID) = 1
 `;
 
 // Customer complaints (Manny, Oct 23 2026): No unless he flags one from the
@@ -681,7 +694,8 @@ async function buildPayload(env, admin) {
     bq(env, SQL_APPT_MANUAL).catch(() => ({ rows: [] })),
     bq(env, SQL_COMMENTS).catch(() => ({ rows: [] })),
     bq(env, SQL_COMPLAINTS).catch(() => ({ rows: [] })),
-    admin ? bq(env, SQL_APPT_DEMOS).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+    // Runs for everyone now: agents get only the "sold" list (Sale column), never the rest.
+    bq(env, SQL_APPT_DEMOS).catch(() => ({ rows: [] })),
     bq(env, SQL_NO_PAY).catch(() => ({ rows: [] })),
   ]);
 
@@ -760,7 +774,11 @@ async function buildPayload(env, admin) {
     ...(admin ? { appt_sms: apptSms.rows.map((r) => r[0]) } : {}),
     // ADMIN ONLY, display only. lead_id -> [demo_status (demoed|no_demo|pending),
     //   basis, advertiser disposition, appointment_at, advertiser]. Missing = no data.
-    ...(admin ? { appt_demo: Object.fromEntries(apptDemos.rows.map((r) => [r[0], r.slice(1)])) } : {}),
+    ...(admin ? { appt_demo: Object.fromEntries(apptDemos.rows.map((r) => [r[0], r.slice(1, 6)])) } : {}),
+    // EVERYONE (Manny, Nov 20 2026): lead IDs the contractor's own report marks as a
+    // sale (dispositions.appointment_demos, matched like appt_demo). Yes/no only —
+    // no revenue or disposition text, agents never see revenue.
+    sold: apptDemos.rows.filter((r) => r[6] === true || r[6] === "true").map((r) => r[0]),
   };
 }
 
