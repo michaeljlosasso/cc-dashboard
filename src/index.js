@@ -535,7 +535,7 @@ const COMPLAINT_REASONS = ["Credit", "Didn't show", "Not interested", "Out of ar
 // no set pay, no spiff, no QA points, no team-goal credit — for any week.
 // First use: Travis Crouse (Nov 18), said "590" on the call and was booked
 // anyway; the buyer complained. The pay rule itself is payableRows() in
-// spiff-rules.js. Everyone sees the flag and reason; the note is admin-only.
+// spiff-rules.js. Shown to Manny only; agents get just the ID list (for the math).
 const SQL_NO_PAY = `
 SELECT lead_id, IFNULL(reason,'') AS reason, IFNULL(note,'') AS note
 FROM \`${PROJECT}.leads.cc_pay_exclude\`
@@ -763,9 +763,10 @@ async function buildPayload(env, admin) {
     complaint_info: Object.fromEntries(complaints.rows.map((r) => [r[0], [r[1], r[2]]])),
     // Lead IDs Manny marked "no pay" (pay nothing for any week). Everyone gets the
     // list — the Commission tab computes pay in the browser and must agree with Payouts.
+    // The reason and note are ADMIN ONLY (Nov 20 2026: agents don't see no-pay at all on screen).
     no_pay: noPay.rows.map((r) => r[0]),
-    no_pay_reason: Object.fromEntries(noPay.rows.map((r) => [r[0], r[1]])),
-    ...(admin ? { no_pay_note: Object.fromEntries(noPay.rows.filter((r) => r[2]).map((r) => [r[0], r[2]])) } : {}),
+    ...(admin ? { no_pay_reason: Object.fromEntries(noPay.rows.map((r) => [r[0], r[1]])),
+                  no_pay_note: Object.fromEntries(noPay.rows.filter((r) => r[2]).map((r) => [r[0], r[2]])) } : {}),
     // Lead IDs flagged out of territory (everyone sees the flag; note is admin-only).
     out_territory: territory.rows.map((r) => r[0]),
     ...(admin ? { out_territory_note: Object.fromEntries(territory.rows.filter((r) => r[1]).map((r) => [r[0], r[1]])) } : {}),
