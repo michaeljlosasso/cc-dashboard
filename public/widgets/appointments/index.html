@@ -764,8 +764,9 @@ function tableCard(rows){
       <td>${qaPill(r,"home")}</td>
       <td>${terrCell(r)}</td>
       <td>${complaintCell(r)}</td>
+${isAdmin()?`
+      <td>${demoCell(r)}</td>`:""}
       <td>${saleCell(r)}</td>${isAdmin()?`
-      <td>${demoCell(r)}</td>
       <td>${chPill(r)}</td>`:""}
       <td class="mono">${esc(r[8]||"—")}</td>
       <td class="sub">${esc(r[9]||"—")}</td>
@@ -793,7 +794,7 @@ function tableCard(rows){
 
     <div class="tbl-scroll log" style="margin-top:14px">
     <table>
-      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Same / Next","sn")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${th("Sale","sale")}${isAdmin()?th("Demo","demo")+th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
+      <thead><tr>${th("Booked","booked")}${th("Setter","setter")}${th("Lead","lead")}${th("Same / Next","sn")}${th("Credit","credit")}${th("Homeowner","home")}${th("Territory","territory")}${th("Complaint","complaint")}${isAdmin()?th("Demo","demo"):""}${th("Sale","sale")}${isAdmin()?th("Channel","channel"):""}${th("Phone","phone")}${th("Email","email")}${th("Campaign","campaign")}${th("Location","location")}</tr></thead>
       <tbody>${body || `<tr><td colspan="${isAdmin()?15:13}" class="sub" style="padding:30px;text-align:center">No appointments this week yet.</td></tr>`}</tbody>
     </table>
     </div>
